@@ -94,11 +94,23 @@ impl From<String> for Maildir {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mailparse::MailHeaderMap;
 
     #[test]
     fn maildir_count() {
         let maildir = Maildir::from(String::from("testdata/maildir1"));
         assert_eq!(maildir.count_cur().unwrap(), 1);
         assert_eq!(maildir.count_new().unwrap(), 1);
+    }
+
+    #[test]
+    fn maildir_list() {
+        let maildir = Maildir::from(String::from("testdata/maildir1"));
+        let mut iter = maildir.list_new().unwrap();
+        let first = iter.next().unwrap().unwrap();
+        assert_eq!(first.id(), "1463941010.5f7fa6dd4922c183dc457d033deee9d7");
+        assert_eq!(first.parsed().unwrap().headers.get_first_value("Subject").unwrap(), Some(String::from("test")));
+        let second = iter.next();
+        assert!(second.is_none());
     }
 }
