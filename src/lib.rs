@@ -73,7 +73,7 @@ impl Maildir {
         Ok(dir.count())
     }
 
-    pub fn summary_new(&self) -> std::io::Result<MailEntries> {
+    pub fn list_new(&self) -> std::io::Result<MailEntries> {
         let dir = try!(self.path_new());
         Ok(MailEntries { readdir: dir })
     }
@@ -93,7 +93,12 @@ impl From<String> for Maildir {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn it_works() {
+    fn maildir_count() {
+        let maildir = Maildir::from(String::from("testdata/maildir1"));
+        assert_eq!(maildir.count_cur().unwrap(), 1);
+        assert_eq!(maildir.count_new().unwrap(), 1);
     }
 }
