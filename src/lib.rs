@@ -129,6 +129,16 @@ impl Maildir {
             is_new: false,
         })
     }
+
+    pub fn move_new_to_cur(&self, id: &str) -> std::io::Result<()> {
+        let mut src = self.path.clone();
+        src.push("new");
+        src.push(id);
+        let mut dst = self.path.clone();
+        dst.push("cur");
+        dst.push(String::from(id) + ":2,");
+        fs::rename(src, dst)
+    }
 }
 
 impl From<PathBuf> for Maildir {
@@ -146,6 +156,9 @@ impl From<String> for Maildir {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::fs;
+
     use mailparse::MailHeaderMap;
 
     #[test]
@@ -175,5 +188,14 @@ mod tests {
         assert_eq!(first.is_seen(), true);
         let second = iter.next();
         assert!(second.is_none());
+    }
+
+    #[test]
+    fn mark_read() {
+        let maildir = Maildir::from(String::from("testdata/maildir1"));
+        assert_eq!(maildir.move_new_to_cur("1463941010.5f7fa6dd4922c183dc457d033deee9d7").unwrap(), ());
+        // Reset the filesystem
+        fs::rename("testdata/maildir1/cur/1463941010.5f7fa6dd4922c183dc457d033deee9d7:2,",
+                   "testdata/maildir1/new/1463941010.5f7fa6dd4922c183dc457d033deee9d7").unwrap();
     }
 }
