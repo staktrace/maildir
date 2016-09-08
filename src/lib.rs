@@ -72,12 +72,17 @@ impl Iterator for MailEntries {
                 }
             };
             if id.is_none() || flags.is_none() {
-                return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Non-maildir file found in maildir"));
+                return Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
+                                               "Non-maildir file found in maildir"));
             }
             let mut f = try!(fs::File::open(entry.path()));
             let mut d = Vec::<u8>::new();
             try!(f.read_to_end(&mut d));
-            Ok(MailEntry{ id: String::from(id.unwrap()), flags: String::from(flags.unwrap()), data: d })
+            Ok(MailEntry {
+                id: String::from(id.unwrap()),
+                flags: String::from(flags.unwrap()),
+                data: d,
+            })
         })
     }
 }
@@ -111,12 +116,18 @@ impl Maildir {
 
     pub fn list_new(&self) -> std::io::Result<MailEntries> {
         let dir = try!(self.path_new());
-        Ok(MailEntries { readdir: dir, is_new: true })
+        Ok(MailEntries {
+            readdir: dir,
+            is_new: true,
+        })
     }
 
     pub fn list_cur(&self) -> std::io::Result<MailEntries> {
         let dir = try!(self.path_cur());
-        Ok(MailEntries { readdir: dir, is_new: false })
+        Ok(MailEntries {
+            readdir: dir,
+            is_new: false,
+        })
     }
 }
 
@@ -150,7 +161,8 @@ mod tests {
         let mut iter = maildir.list_new().unwrap();
         let first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463941010.5f7fa6dd4922c183dc457d033deee9d7");
-        assert_eq!(first.headers().unwrap().get_first_value("Subject").unwrap(), Some(String::from("test")));
+        assert_eq!(first.headers().unwrap().get_first_value("Subject").unwrap(),
+                   Some(String::from("test")));
         assert_eq!(first.is_seen(), false);
         let second = iter.next();
         assert!(second.is_none());
@@ -158,7 +170,8 @@ mod tests {
         let mut iter = maildir.list_cur().unwrap();
         let first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463868505.38518452d49213cb409aa1db32f53184");
-        assert_eq!(first.parsed().unwrap().headers.get_first_value("Subject").unwrap(), Some(String::from("test")));
+        assert_eq!(first.parsed().unwrap().headers.get_first_value("Subject").unwrap(),
+                   Some(String::from("test")));
         assert_eq!(first.is_seen(), true);
         let second = iter.next();
         assert!(second.is_none());
