@@ -51,9 +51,14 @@ impl MailEntry {
     }
 }
 
+enum Subfolder {
+    New,
+    Cur,
+}
+
 pub struct MailEntries {
     readdir: fs::ReadDir,
-    is_new: bool,
+    subfolder: Subfolder,
 }
 
 impl Iterator for MailEntries {
@@ -64,9 +69,9 @@ impl Iterator for MailEntries {
         dir_entry.map(|e| {
             let entry = try!(e);
             let filename = String::from(entry.file_name().to_string_lossy().deref());
-            let (id, flags) = match self.is_new {
-                true => (Some(filename.as_str()), Some("")),
-                false => {
+            let (id, flags) = match self.subfolder {
+                Subfolder::New => (Some(filename.as_str()), Some("")),
+                Subfolder::Cur => {
                     let mut iter = filename.split(":2,");
                     (iter.next(), iter.next())
                 }
@@ -118,7 +123,7 @@ impl Maildir {
         let dir = try!(self.path_new());
         Ok(MailEntries {
             readdir: dir,
-            is_new: true,
+            subfolder: Subfolder::New,
         })
     }
 
@@ -126,7 +131,7 @@ impl Maildir {
         let dir = try!(self.path_cur());
         Ok(MailEntries {
             readdir: dir,
-            is_new: false,
+            subfolder: Subfolder::Cur,
         })
     }
 
