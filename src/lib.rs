@@ -57,15 +57,28 @@ enum Subfolder {
 }
 
 pub struct MailEntries {
-    readdir: fs::ReadDir,
+    path: PathBuf,
     subfolder: Subfolder,
+    readdir: Option<fs::ReadDir>,
 }
 
 impl Iterator for MailEntries {
     type Item = std::io::Result<MailEntry>;
 
     fn next(&mut self) -> Option<std::io::Result<MailEntry>> {
-        let dir_entry = self.readdir.next();
+        if self.readdir.is_none() {
+            let mut dir_path = self.path.clone();
+            dir_path.push(match self.subfolder {
+                Subfolder::New => "new",
+                Subfolder::Cur => "cur",
+            });
+            self.readdir = match fs::read_dir(dir_path) {
+                Err(_) => return None,
+                Ok(v) => Some(v),
+            };
+        }
+
+        let dir_entry = self.readdir.iter_mut().next().unwrap().next();
         dir_entry.map(|e| {
             let entry = try!(e);
             let filename = String::from(entry.file_name().to_string_lossy().deref());
@@ -119,20 +132,20 @@ impl Maildir {
         Ok(dir.count())
     }
 
-    pub fn list_new(&self) -> std::io::Result<MailEntries> {
-        let dir = try!(self.path_new());
-        Ok(MailEntries {
-            readdir: dir,
+    pub fn list_new(&self) -> MailEntries {
+        MailEntries {
+            path: self.path.clone(),
             subfolder: Subfolder::New,
-        })
+            readdir: None,
+        }
     }
 
-    pub fn list_cur(&self) -> std::io::Result<MailEntries> {
-        let dir = try!(self.path_cur());
-        Ok(MailEntries {
-            readdir: dir,
+    pub fn list_cur(&self) -> MailEntries {
+        MailEntries {
+            path: self.path.clone(),
             subfolder: Subfolder::Cur,
-        })
+            readdir: None,
+        }
     }
 
     pub fn move_new_to_cur(&self, id: &str) -> std::io::Result<()> {
@@ -176,7 +189,7 @@ mod tests {
     #[test]
     fn maildir_list() {
         let maildir = Maildir::from(String::from("testdata/maildir1"));
-        let mut iter = maildir.list_new().unwrap();
+        let mut iter = maildir.list_new();
         let first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463941010.5f7fa6dd4922c183dc457d033deee9d7");
         assert_eq!(first.headers().unwrap().get_first_value("Subject").unwrap(),
@@ -185,7 +198,7 @@ mod tests {
         let second = iter.next();
         assert!(second.is_none());
 
-        let mut iter = maildir.list_cur().unwrap();
+        let mut iter = maildir.list_cur();
         let first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463868505.38518452d49213cb409aa1db32f53184");
         assert_eq!(first.parsed().unwrap().headers.get_first_value("Subject").unwrap(),
