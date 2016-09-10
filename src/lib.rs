@@ -1,5 +1,7 @@
 extern crate mailparse;
 
+use std::error;
+use std::fmt;
 use std::fs;
 use std::io::prelude::*;
 use std::ops::Deref;
@@ -10,7 +12,51 @@ use mailparse::*;
 pub struct MailEntry {
     id: String,
     flags: String,
-    data: Vec<u8>,
+    path: PathBuf,
+    data: Option<Vec<u8>>,
+}
+
+#[derive(Debug)]
+pub enum MailEntryError {
+    IOError(std::io::Error),
+    ParseError(MailParseError),
+}
+
+impl fmt::Display for MailEntryError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            MailEntryError::IOError(ref err) => write!(f, "IO error: {}", err),
+            MailEntryError::ParseError(ref err) => write!(f, "Parse error: {}", err),
+        }
+    }
+}
+
+impl error::Error for MailEntryError {
+    fn description(&self) -> &str {
+        match *self {
+            MailEntryError::IOError(ref err) => err.description(),
+            MailEntryError::ParseError(ref err) => err.description(),
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            MailEntryError::IOError(ref err) => Some(err),
+            MailEntryError::ParseError(ref err) => Some(err),
+        }
+    }
+}
+
+impl From<std::io::Error> for MailEntryError {
+    fn from(err: std::io::Error) -> MailEntryError {
+        MailEntryError::IOError(err)
+    }
+}
+
+impl From<MailParseError> for MailEntryError {
+    fn from(err: MailParseError) -> MailEntryError {
+        MailEntryError::ParseError(err)
+    }
 }
 
 impl MailEntry {
@@ -18,12 +64,24 @@ impl MailEntry {
         &self.id
     }
 
-    pub fn parsed(&self) -> Result<ParsedMail, MailParseError> {
-        parse_mail(&self.data)
+    fn read_data(&mut self) -> std::io::Result<()> {
+        if self.data.is_none() {
+            let mut f = try!(fs::File::open(self.path.clone()));
+            let mut d = Vec::<u8>::new();
+            try!(f.read_to_end(&mut d));
+            self.data = Some(d);
+        }
+        Ok(())
     }
 
-    pub fn headers(&self) -> Result<Vec<MailHeader>, MailParseError> {
-        parse_headers(&self.data).map(|(v, _)| v)
+    pub fn parsed(&mut self) -> Result<ParsedMail, MailEntryError> {
+        try!(self.read_data());
+        parse_mail(self.data.as_ref().unwrap()).map_err(|e| MailEntryError::ParseError(e))
+    }
+
+    pub fn headers(&mut self) -> Result<Vec<MailHeader>, MailEntryError> {
+        try!(self.read_data());
+        parse_headers(self.data.as_ref().unwrap()).map(|(v, _)| v).map_err(|e| MailEntryError::ParseError(e))
     }
 
     pub fn is_draft(&self) -> bool {
@@ -97,13 +155,11 @@ impl Iterator for MailEntries {
                     return Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
                                                    "Non-maildir file found in maildir"));
                 }
-                let mut f = try!(fs::File::open(entry.path()));
-                let mut d = Vec::<u8>::new();
-                try!(f.read_to_end(&mut d));
                 Ok(Some(MailEntry {
                     id: String::from(id.unwrap()),
                     flags: String::from(flags.unwrap()),
-                    data: d,
+                    path: entry.path(),
+                    data: None,
                 }))
             });
             return match result {
@@ -187,7 +243,7 @@ mod tests {
     fn maildir_list() {
         let maildir = Maildir::from(String::from("testdata/maildir1"));
         let mut iter = maildir.list_new();
-        let first = iter.next().unwrap().unwrap();
+        let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463941010.5f7fa6dd4922c183dc457d033deee9d7");
         assert_eq!(first.headers().unwrap().get_first_value("Subject").unwrap(),
                    Some(String::from("test")));
@@ -196,7 +252,7 @@ mod tests {
         assert!(second.is_none());
 
         let mut iter = maildir.list_cur();
-        let first = iter.next().unwrap().unwrap();
+        let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463868505.38518452d49213cb409aa1db32f53184");
         assert_eq!(first.parsed().unwrap().headers.get_first_value("Subject").unwrap(),
                    Some(String::from("test")));
