@@ -224,6 +224,12 @@ impl From<String> for Maildir {
     }
 }
 
+impl <'a> From<&'a str> for Maildir {
+    fn from(s: &str) -> Maildir {
+        Maildir::from(PathBuf::from(s))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,14 +240,14 @@ mod tests {
 
     #[test]
     fn maildir_count() {
-        let maildir = Maildir::from(String::from("testdata/maildir1"));
+        let maildir = Maildir::from("testdata/maildir1");
         assert_eq!(maildir.count_cur(), 1);
         assert_eq!(maildir.count_new(), 1);
     }
 
     #[test]
     fn maildir_list() {
-        let maildir = Maildir::from(String::from("testdata/maildir1"));
+        let maildir = Maildir::from("testdata/maildir1");
         let mut iter = maildir.list_new();
         let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463941010.5f7fa6dd4922c183dc457d033deee9d7");
@@ -263,7 +269,7 @@ mod tests {
 
     #[test]
     fn mark_read() {
-        let maildir = Maildir::from(String::from("testdata/maildir1"));
+        let maildir = Maildir::from("testdata/maildir1");
         assert_eq!(maildir.move_new_to_cur("1463941010.5f7fa6dd4922c183dc457d033deee9d7").unwrap(), ());
         // Reset the filesystem
         fs::rename("testdata/maildir1/cur/1463941010.5f7fa6dd4922c183dc457d033deee9d7:2,",
