@@ -78,30 +78,41 @@ impl Iterator for MailEntries {
             };
         }
 
-        let dir_entry = self.readdir.iter_mut().next().unwrap().next();
-        dir_entry.map(|e| {
-            let entry = try!(e);
-            let filename = String::from(entry.file_name().to_string_lossy().deref());
-            let (id, flags) = match self.subfolder {
-                Subfolder::New => (Some(filename.as_str()), Some("")),
-                Subfolder::Cur => {
-                    let mut iter = filename.split(":2,");
-                    (iter.next(), iter.next())
+        loop { // we need to skip over files starting with a '.'
+            let dir_entry = self.readdir.iter_mut().next().unwrap().next();
+            let result = dir_entry.map(|e| {
+                let entry = try!(e);
+                let filename = String::from(entry.file_name().to_string_lossy().deref());
+                if filename.starts_with(".") {
+                    return Ok(None);
                 }
+                let (id, flags) = match self.subfolder {
+                    Subfolder::New => (Some(filename.as_str()), Some("")),
+                    Subfolder::Cur => {
+                        let mut iter = filename.split(":2,");
+                        (iter.next(), iter.next())
+                    }
+                };
+                if id.is_none() || flags.is_none() {
+                    return Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
+                                                   "Non-maildir file found in maildir"));
+                }
+                let mut f = try!(fs::File::open(entry.path()));
+                let mut d = Vec::<u8>::new();
+                try!(f.read_to_end(&mut d));
+                Ok(Some(MailEntry {
+                    id: String::from(id.unwrap()),
+                    flags: String::from(flags.unwrap()),
+                    data: d,
+                }))
+            });
+            return match result {
+                None => None,
+                Some(Err(e)) => Some(Err(e)),
+                Some(Ok(None)) => continue,
+                Some(Ok(Some(v))) => Some(Ok(v)),
             };
-            if id.is_none() || flags.is_none() {
-                return Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
-                                               "Non-maildir file found in maildir"));
-            }
-            let mut f = try!(fs::File::open(entry.path()));
-            let mut d = Vec::<u8>::new();
-            try!(f.read_to_end(&mut d));
-            Ok(MailEntry {
-                id: String::from(id.unwrap()),
-                flags: String::from(flags.unwrap()),
-                data: d,
-            })
-        })
+        }
     }
 }
 
@@ -110,26 +121,12 @@ pub struct Maildir {
 }
 
 impl Maildir {
-    fn path_new(&self) -> std::io::Result<fs::ReadDir> {
-        let mut new_path = self.path.clone();
-        new_path.push("new");
-        fs::read_dir(new_path)
+    pub fn count_new(&self) -> usize {
+        self.list_new().count()
     }
 
-    fn path_cur(&self) -> std::io::Result<fs::ReadDir> {
-        let mut cur_path = self.path.clone();
-        cur_path.push("cur");
-        fs::read_dir(cur_path)
-    }
-
-    pub fn count_new(&self) -> std::io::Result<usize> {
-        let dir = try!(self.path_new());
-        Ok(dir.count())
-    }
-
-    pub fn count_cur(&self) -> std::io::Result<usize> {
-        let dir = try!(self.path_cur());
-        Ok(dir.count())
+    pub fn count_cur(&self) -> usize {
+        self.list_cur().count()
     }
 
     pub fn list_new(&self) -> MailEntries {
@@ -182,8 +179,8 @@ mod tests {
     #[test]
     fn maildir_count() {
         let maildir = Maildir::from(String::from("testdata/maildir1"));
-        assert_eq!(maildir.count_cur().unwrap(), 1);
-        assert_eq!(maildir.count_new().unwrap(), 1);
+        assert_eq!(maildir.count_cur(), 1);
+        assert_eq!(maildir.count_new(), 1);
     }
 
     #[test]
