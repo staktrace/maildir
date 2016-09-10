@@ -84,6 +84,10 @@ impl MailEntry {
         parse_headers(self.data.as_ref().unwrap()).map(|(v, _)| v).map_err(|e| MailEntryError::ParseError(e))
     }
 
+    pub fn flags(&self) -> &str {
+        &self.flags
+    }
+
     pub fn is_draft(&self) -> bool {
         self.flags.contains('D')
     }
