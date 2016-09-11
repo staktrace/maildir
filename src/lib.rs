@@ -214,6 +214,17 @@ impl Maildir {
         dst.push(String::from(id) + ":2,");
         fs::rename(src, dst)
     }
+
+    pub fn find(&self, id: &str) -> Option<MailEntry> {
+        let filter = |entry: &std::io::Result<MailEntry>| {
+            match *entry {
+                Err(_) => false,
+                Ok(ref e) => e.id() == id,
+            }
+        };
+
+        self.list_new().find(&filter).or(self.list_cur().find(&filter)).map(|e| e.unwrap())
+    }
 }
 
 impl From<PathBuf> for Maildir {
@@ -269,6 +280,14 @@ mod tests {
         assert_eq!(first.is_seen(), true);
         let second = iter.next();
         assert!(second.is_none());
+    }
+
+    #[test]
+    fn maildir_find() {
+        let maildir = Maildir::from("testdata/maildir1");
+        assert_eq!(maildir.find("bad_id").is_some(), false);
+        assert_eq!(maildir.find("1463941010.5f7fa6dd4922c183dc457d033deee9d7").is_some(), true);
+        assert_eq!(maildir.find("1463868505.38518452d49213cb409aa1db32f53184").is_some(), true);
     }
 
     #[test]
