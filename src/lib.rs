@@ -81,7 +81,9 @@ impl MailEntry {
 
     pub fn headers(&mut self) -> Result<Vec<MailHeader>, MailEntryError> {
         try!(self.read_data());
-        parse_headers(self.data.as_ref().unwrap()).map(|(v, _)| v).map_err(|e| MailEntryError::ParseError(e))
+        parse_headers(self.data.as_ref().unwrap())
+            .map(|(v, _)| v)
+            .map_err(|e| MailEntryError::ParseError(e))
     }
 
     pub fn flags(&self) -> &str {
@@ -140,7 +142,8 @@ impl Iterator for MailEntries {
             };
         }
 
-        loop { // we need to skip over files starting with a '.'
+        loop {
+            // we need to skip over files starting with a '.'
             let dir_entry = self.readdir.iter_mut().next().unwrap().next();
             let result = dir_entry.map(|e| {
                 let entry = try!(e);
@@ -239,7 +242,7 @@ impl From<String> for Maildir {
     }
 }
 
-impl <'a> From<&'a str> for Maildir {
+impl<'a> From<&'a str> for Maildir {
     fn from(s: &str) -> Maildir {
         Maildir::from(PathBuf::from(s))
     }
@@ -286,16 +289,20 @@ mod tests {
     fn maildir_find() {
         let maildir = Maildir::from("testdata/maildir1");
         assert_eq!(maildir.find("bad_id").is_some(), false);
-        assert_eq!(maildir.find("1463941010.5f7fa6dd4922c183dc457d033deee9d7").is_some(), true);
-        assert_eq!(maildir.find("1463868505.38518452d49213cb409aa1db32f53184").is_some(), true);
+        assert_eq!(maildir.find("1463941010.5f7fa6dd4922c183dc457d033deee9d7").is_some(),
+                   true);
+        assert_eq!(maildir.find("1463868505.38518452d49213cb409aa1db32f53184").is_some(),
+                   true);
     }
 
     #[test]
     fn mark_read() {
         let maildir = Maildir::from("testdata/maildir1");
-        assert_eq!(maildir.move_new_to_cur("1463941010.5f7fa6dd4922c183dc457d033deee9d7").unwrap(), ());
+        assert_eq!(maildir.move_new_to_cur("1463941010.5f7fa6dd4922c183dc457d033deee9d7").unwrap(),
+                   ());
         // Reset the filesystem
         fs::rename("testdata/maildir1/cur/1463941010.5f7fa6dd4922c183dc457d033deee9d7:2,",
-                   "testdata/maildir1/new/1463941010.5f7fa6dd4922c183dc457d033deee9d7").unwrap();
+                   "testdata/maildir1/new/1463941010.5f7fa6dd4922c183dc457d033deee9d7")
+            .unwrap();
     }
 }
