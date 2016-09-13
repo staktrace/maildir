@@ -223,7 +223,7 @@ impl Maildir {
             }
         };
 
-        self.list_new().find(&filter).or(self.list_cur().find(&filter)).map(|e| e.unwrap())
+        self.list_new().find(&filter).or_else(|| self.list_cur().find(&filter)).map(|e| e.unwrap())
     }
 }
 
