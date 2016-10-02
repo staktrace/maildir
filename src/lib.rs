@@ -20,6 +20,7 @@ pub struct MailEntry {
 pub enum MailEntryError {
     IOError(std::io::Error),
     ParseError(MailParseError),
+    DateError(&'static str),
 }
 
 impl fmt::Display for MailEntryError {
@@ -27,6 +28,7 @@ impl fmt::Display for MailEntryError {
         match *self {
             MailEntryError::IOError(ref err) => write!(f, "IO error: {}", err),
             MailEntryError::ParseError(ref err) => write!(f, "Parse error: {}", err),
+            MailEntryError::DateError(ref msg) => write!(f, "Date error: {}", msg),
         }
     }
 }
@@ -36,6 +38,7 @@ impl error::Error for MailEntryError {
         match *self {
             MailEntryError::IOError(ref err) => err.description(),
             MailEntryError::ParseError(ref err) => err.description(),
+            MailEntryError::DateError(ref msg) => msg,
         }
     }
 
@@ -43,6 +46,7 @@ impl error::Error for MailEntryError {
         match *self {
             MailEntryError::IOError(ref err) => Some(err),
             MailEntryError::ParseError(ref err) => Some(err),
+            MailEntryError::DateError(_) => None,
         }
     }
 }
@@ -56,6 +60,12 @@ impl From<std::io::Error> for MailEntryError {
 impl From<MailParseError> for MailEntryError {
     fn from(err: MailParseError) -> MailEntryError {
         MailEntryError::ParseError(err)
+    }
+}
+
+impl From<&'static str> for MailEntryError {
+    fn from(err: &'static str) -> MailEntryError {
+        MailEntryError::DateError(err)
     }
 }
 
@@ -84,6 +94,21 @@ impl MailEntry {
         parse_headers(self.data.as_ref().unwrap())
             .map(|(v, _)| v)
             .map_err(|e| MailEntryError::ParseError(e))
+    }
+
+    pub fn received(&mut self) -> Result<i64, MailEntryError> {
+        try!(self.read_data());
+        let headers = try!(self.headers());
+        let received = try!(headers.get_first_value("Received"));
+        match received {
+            Some(v) => {
+                for ts in v.rsplit(';') {
+                    return dateparse(ts).map_err(MailEntryError::from);
+                }
+                try!(Err("Unable to split Received header"))
+            }
+            None => try!(Err("No Received header found"))
+        }
     }
 
     pub fn flags(&self) -> &str {
