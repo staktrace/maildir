@@ -9,13 +9,6 @@ use std::path::PathBuf;
 
 use mailparse::*;
 
-pub struct MailEntry {
-    id: String,
-    flags: String,
-    path: PathBuf,
-    data: Option<Vec<u8>>,
-}
-
 #[derive(Debug)]
 pub enum MailEntryError {
     IOError(std::io::Error),
@@ -67,6 +60,13 @@ impl From<&'static str> for MailEntryError {
     fn from(err: &'static str) -> MailEntryError {
         MailEntryError::DateError(err)
     }
+}
+
+pub struct MailEntry {
+    id: String,
+    flags: String,
+    path: PathBuf,
+    data: Option<Vec<u8>>,
 }
 
 impl MailEntry {
