@@ -330,4 +330,12 @@ mod tests {
                    "testdata/maildir1/new/1463941010.5f7fa6dd4922c183dc457d033deee9d7")
             .unwrap();
     }
+
+    #[test]
+    fn check_received() {
+        let maildir = Maildir::from("testdata/maildir1");
+        let mut iter = maildir.list_cur();
+        let mut first = iter.next().unwrap().unwrap();
+        assert_eq!(first.received().unwrap(), 1463868507);
+    }
 }
