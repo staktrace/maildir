@@ -151,6 +151,16 @@ pub struct MailEntries {
     readdir: Option<fs::ReadDir>,
 }
 
+impl MailEntries {
+    fn new(path: PathBuf, subfolder: Subfolder) -> MailEntries {
+        MailEntries {
+            path: path,
+            subfolder: subfolder,
+            readdir: None,
+        }
+    }
+}
+
 impl Iterator for MailEntries {
     type Item = std::io::Result<MailEntry>;
 
@@ -218,19 +228,11 @@ impl Maildir {
     }
 
     pub fn list_new(&self) -> MailEntries {
-        MailEntries {
-            path: self.path.clone(),
-            subfolder: Subfolder::New,
-            readdir: None,
-        }
+        MailEntries::new(self.path.clone(), Subfolder::New)
     }
 
     pub fn list_cur(&self) -> MailEntries {
-        MailEntries {
-            path: self.path.clone(),
-            subfolder: Subfolder::Cur,
-            readdir: None,
-        }
+        MailEntries::new(self.path.clone(), Subfolder::Cur)
     }
 
     pub fn move_new_to_cur(&self, id: &str) -> std::io::Result<()> {
