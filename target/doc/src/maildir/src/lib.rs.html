@@ -385,6 +385,40 @@
 <span id="341">341</span>
 <span id="342">342</span>
 <span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
 </pre><pre class='rust '>
 <span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>mailparse</span>;
 
@@ -450,6 +484,11 @@
     }
 }
 
+<span class='doccomment'>/// This struct represents a single email message inside</span>
+<span class='doccomment'>/// the maildir. Creation of the struct does not automatically</span>
+<span class='doccomment'>/// load the content of the email file into memory - however,</span>
+<span class='doccomment'>/// that may happen upon calling functions that require parsing</span>
+<span class='doccomment'>/// the email.</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>MailEntry</span> {
     <span class='ident'>id</span>: <span class='ident'>String</span>,
     <span class='ident'>flags</span>: <span class='ident'>String</span>,
@@ -495,7 +534,7 @@
                 }
                 <span class='macro'>try</span><span class='macro'>!</span>(<span class='prelude-val'>Err</span>(<span class='string'>&quot;Unable to split Received header&quot;</span>))
             }
-            <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='prelude-val'>Err</span>(<span class='string'>&quot;No Received header found&quot;</span>))
+            <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='prelude-val'>Err</span>(<span class='string'>&quot;No Received header found&quot;</span>)),
         }
     }
 
@@ -533,6 +572,13 @@
     <span class='ident'>Cur</span>,
 }
 
+<span class='doccomment'>/// An iterator over the email messages in a particular</span>
+<span class='doccomment'>/// maildir subfolder (either `cur` or `new`). This iterator</span>
+<span class='doccomment'>/// produces a `std::io::Result&lt;MailEntry&gt;`, which can be an</span>
+<span class='doccomment'>/// `Err` if an error was encountered while trying to read</span>
+<span class='doccomment'>/// file system properties on a particular entry, or if an</span>
+<span class='doccomment'>/// invalid file was found in the maildir. Files starting with</span>
+<span class='doccomment'>/// a dot (.) character in the maildir folder are ignored.</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>MailEntries</span> {
     <span class='ident'>path</span>: <span class='ident'>PathBuf</span>,
     <span class='ident'>subfolder</span>: <span class='ident'>Subfolder</span>,
@@ -602,27 +648,46 @@
     }
 }
 
+<span class='doccomment'>/// The main entry point for this library. This struct can be</span>
+<span class='doccomment'>/// instantiated from a path using the `from` implementations.</span>
+<span class='doccomment'>/// The path passed in to the `from` should be the root of the</span>
+<span class='doccomment'>/// maildir (the folder containing `cur`, `new`, and `tmp`).</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>Maildir</span> {
     <span class='ident'>path</span>: <span class='ident'>PathBuf</span>,
 }
 
 <span class='kw'>impl</span> <span class='ident'>Maildir</span> {
+    <span class='doccomment'>/// Returns the number of messages found inside the `new`</span>
+    <span class='doccomment'>/// maildir folder.</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>count_new</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>usize</span> {
         <span class='self'>self</span>.<span class='ident'>list_new</span>().<span class='ident'>count</span>()
     }
 
+    <span class='doccomment'>/// Returns the number of messages found inside the `cur`</span>
+    <span class='doccomment'>/// maildir folder.</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>count_cur</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>usize</span> {
         <span class='self'>self</span>.<span class='ident'>list_cur</span>().<span class='ident'>count</span>()
     }
 
+    <span class='doccomment'>/// Returns an iterator over the messages inside the `new`</span>
+    <span class='doccomment'>/// maildir folder. The order of messages in the iterator</span>
+    <span class='doccomment'>/// is not specified, and is not guaranteed to be stable</span>
+    <span class='doccomment'>/// over multiple invocations of this method.</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>list_new</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>MailEntries</span> {
         <span class='ident'>MailEntries</span>::<span class='ident'>new</span>(<span class='self'>self</span>.<span class='ident'>path</span>.<span class='ident'>clone</span>(), <span class='ident'>Subfolder</span>::<span class='ident'>New</span>)
     }
 
+    <span class='doccomment'>/// Returns an iterator over the messages inside the `cur`</span>
+    <span class='doccomment'>/// maildir folder. The order of messages in the iterator</span>
+    <span class='doccomment'>/// is not specified, and is not guaranteed to be stable</span>
+    <span class='doccomment'>/// over multiple invocations of this method.</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>list_cur</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>MailEntries</span> {
         <span class='ident'>MailEntries</span>::<span class='ident'>new</span>(<span class='self'>self</span>.<span class='ident'>path</span>.<span class='ident'>clone</span>(), <span class='ident'>Subfolder</span>::<span class='ident'>Cur</span>)
     }
 
+    <span class='doccomment'>/// Moves a message from the `new` maildir folder to the</span>
+    <span class='doccomment'>/// `cur` maildir folder. The id passed in should be</span>
+    <span class='doccomment'>/// obtained from the iterator produced by `list_new`.</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>move_new_to_cur</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>id</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span>()<span class='op'>&gt;</span> {
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>src</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>path</span>.<span class='ident'>clone</span>();
         <span class='ident'>src</span>.<span class='ident'>push</span>(<span class='string'>&quot;new&quot;</span>);
@@ -633,6 +698,9 @@
         <span class='ident'>fs</span>::<span class='ident'>rename</span>(<span class='ident'>src</span>, <span class='ident'>dst</span>)
     }
 
+    <span class='doccomment'>/// Tries to find the message with the given id in the</span>
+    <span class='doccomment'>/// maildir. This searches both the `new` and the `cur`</span>
+    <span class='doccomment'>/// folders.</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>find</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>id</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>MailEntry</span><span class='op'>&gt;</span> {
         <span class='kw'>let</span> <span class='ident'>filter</span> <span class='op'>=</span> <span class='op'>|</span><span class='ident'>entry</span>: <span class='kw-2'>&amp;</span><span class='ident'>std</span>::<span class='ident'>io</span>::<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>MailEntry</span><span class='op'>&gt;</span><span class='op'>|</span> {
             <span class='kw'>match</span> <span class='op'>*</span><span class='ident'>entry</span> {

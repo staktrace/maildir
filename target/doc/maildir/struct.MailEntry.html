@@ -47,8 +47,13 @@
                    <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                        [<span class='inner'>&#x2212;</span>]
                    </a>
-               </span><a id='src-61' class='srclink' href='../src/maildir/src/lib.rs.html#65-70' title='goto source code'>[src]</a></span></h1>
-<pre class='rust struct'>pub struct MailEntry { /* fields omitted */ }</pre><h2 id='methods'>Methods</h2><h3 class='impl'><span class='in-band'><code>impl <a class='struct' href='../maildir/struct.MailEntry.html' title='maildir::MailEntry'>MailEntry</a></code></span><span class='out-of-band'><div class='ghost'></div><a id='src-66' class='srclink' href='../src/maildir/src/lib.rs.html#72-141' title='goto source code'>[src]</a></span></h3>
+               </span><a id='src-61' class='srclink' href='../src/maildir/src/lib.rs.html#70-75' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct MailEntry { /* fields omitted */ }</pre><div class='docblock'><p>This struct represents a single email message inside
+the maildir. Creation of the struct does not automatically
+load the content of the email file into memory - however,
+that may happen upon calling functions that require parsing
+the email.</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><span class='in-band'><code>impl <a class='struct' href='../maildir/struct.MailEntry.html' title='maildir::MailEntry'>MailEntry</a></code></span><span class='out-of-band'><div class='ghost'></div><a id='src-66' class='srclink' href='../src/maildir/src/lib.rs.html#77-146' title='goto source code'>[src]</a></span></h3>
 <div class='impl-items'><h4 id='method.id' class='method'><span id='id.v' class='invisible'><code>fn <a href='#method.id' class='fnname'>id</a>(&amp;self) -&gt; &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a></code></span></h4>
 <h4 id='method.parsed' class='method'><span id='parsed.v' class='invisible'><code>fn <a href='#method.parsed' class='fnname'>parsed</a>(&amp;mut self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;ParsedMail,&nbsp;<a class='enum' href='../maildir/enum.MailEntryError.html' title='maildir::MailEntryError'>MailEntryError</a>&gt;</code></span></h4>
 <h4 id='method.headers' class='method'><span id='headers.v' class='invisible'><code>fn <a href='#method.headers' class='fnname'>headers</a>(&amp;mut self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;MailHeader&gt;,&nbsp;<a class='enum' href='../maildir/enum.MailEntryError.html' title='maildir::MailEntryError'>MailEntryError</a>&gt;</code></span></h4>

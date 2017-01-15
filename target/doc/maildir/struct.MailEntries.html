@@ -47,8 +47,15 @@
                    <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                        [<span class='inner'>&#x2212;</span>]
                    </a>
-               </span><a id='src-125' class='srclink' href='../src/maildir/src/lib.rs.html#148-152' title='goto source code'>[src]</a></span></h1>
-<pre class='rust struct'>pub struct MailEntries { /* fields omitted */ }</pre><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><span class='in-band'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/iter/iterator/trait.Iterator.html' title='core::iter::iterator::Iterator'>Iterator</a> for <a class='struct' href='../maildir/struct.MailEntries.html' title='maildir::MailEntries'>MailEntries</a></code></span><span class='out-of-band'><div class='ghost'></div><a id='src-133' class='srclink' href='../src/maildir/src/lib.rs.html#164-215' title='goto source code'>[src]</a></span></h3>
+               </span><a id='src-125' class='srclink' href='../src/maildir/src/lib.rs.html#160-164' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct MailEntries { /* fields omitted */ }</pre><div class='docblock'><p>An iterator over the email messages in a particular
+maildir subfolder (either <code>cur</code> or <code>new</code>). This iterator
+produces a <code>std::io::Result&lt;MailEntry&gt;</code>, which can be an
+<code>Err</code> if an error was encountered while trying to read
+file system properties on a particular entry, or if an
+invalid file was found in the maildir. Files starting with
+a dot (.) character in the maildir folder are ignored.</p>
+</div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><span class='in-band'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/iter/iterator/trait.Iterator.html' title='core::iter::iterator::Iterator'>Iterator</a> for <a class='struct' href='../maildir/struct.MailEntries.html' title='maildir::MailEntries'>MailEntries</a></code></span><span class='out-of-band'><div class='ghost'></div><a id='src-133' class='srclink' href='../src/maildir/src/lib.rs.html#176-227' title='goto source code'>[src]</a></span></h3>
 <div class='impl-items'><h4 id='associatedtype.Item' class='type'><span id='Item.t' class='invisible'><code>type <a href='https://doc.rust-lang.org/nightly/core/iter/iterator/trait.Iterator.html#associatedtype.Item' class='type'>Item</a> = <a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='struct' href='../maildir/struct.MailEntry.html' title='maildir::MailEntry'>MailEntry</a>&gt;</code></span></h4>
 <div class='docblock'><p>The type of the elements being iterated over.</p>
 </div><h4 id='method.next' class='method'><span id='next.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/iter/iterator/trait.Iterator.html#tymethod.next' class='fnname'>next</a>(&amp;mut self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='type' href='https://doc.rust-lang.org/nightly/std/io/error/type.Result.html' title='std::io::error::Result'>Result</a>&lt;<a class='struct' href='../maildir/struct.MailEntry.html' title='maildir::MailEntry'>MailEntry</a>&gt;&gt;</code></span></h4>

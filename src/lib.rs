@@ -62,6 +62,11 @@ impl From<&'static str> for MailEntryError {
     }
 }
 
+/// This struct represents a single email message inside
+/// the maildir. Creation of the struct does not automatically
+/// load the content of the email file into memory - however,
+/// that may happen upon calling functions that require parsing
+/// the email.
 pub struct MailEntry {
     id: String,
     flags: String,
@@ -145,6 +150,13 @@ enum Subfolder {
     Cur,
 }
 
+/// An iterator over the email messages in a particular
+/// maildir subfolder (either `cur` or `new`). This iterator
+/// produces a `std::io::Result<MailEntry>`, which can be an
+/// `Err` if an error was encountered while trying to read
+/// file system properties on a particular entry, or if an
+/// invalid file was found in the maildir. Files starting with
+/// a dot (.) character in the maildir folder are ignored.
 pub struct MailEntries {
     path: PathBuf,
     subfolder: Subfolder,
@@ -214,27 +226,46 @@ impl Iterator for MailEntries {
     }
 }
 
+/// The main entry point for this library. This struct can be
+/// instantiated from a path using the `from` implementations.
+/// The path passed in to the `from` should be the root of the
+/// maildir (the folder containing `cur`, `new`, and `tmp`).
 pub struct Maildir {
     path: PathBuf,
 }
 
 impl Maildir {
+    /// Returns the number of messages found inside the `new`
+    /// maildir folder.
     pub fn count_new(&self) -> usize {
         self.list_new().count()
     }
 
+    /// Returns the number of messages found inside the `cur`
+    /// maildir folder.
     pub fn count_cur(&self) -> usize {
         self.list_cur().count()
     }
 
+    /// Returns an iterator over the messages inside the `new`
+    /// maildir folder. The order of messages in the iterator
+    /// is not specified, and is not guaranteed to be stable
+    /// over multiple invocations of this method.
     pub fn list_new(&self) -> MailEntries {
         MailEntries::new(self.path.clone(), Subfolder::New)
     }
 
+    /// Returns an iterator over the messages inside the `cur`
+    /// maildir folder. The order of messages in the iterator
+    /// is not specified, and is not guaranteed to be stable
+    /// over multiple invocations of this method.
     pub fn list_cur(&self) -> MailEntries {
         MailEntries::new(self.path.clone(), Subfolder::Cur)
     }
 
+    /// Moves a message from the `new` maildir folder to the
+    /// `cur` maildir folder. The id passed in should be
+    /// obtained from the iterator produced by `list_new`.
     pub fn move_new_to_cur(&self, id: &str) -> std::io::Result<()> {
         let mut src = self.path.clone();
         src.push("new");
@@ -245,6 +276,9 @@ impl Maildir {
         fs::rename(src, dst)
     }
 
+    /// Tries to find the message with the given id in the
+    /// maildir. This searches both the `new` and the `cur`
+    /// folders.
     pub fn find(&self, id: &str) -> Option<MailEntry> {
         let filter = |entry: &std::io::Result<MailEntry>| {
             match *entry {
