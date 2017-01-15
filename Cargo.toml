@@ -2,6 +2,13 @@
 name = "maildir"
 version = "0.1.0"
 authors = ["Kartikaya Gupta <kats@seldon.staktrace.com>"]
+description = "A simple library for maildir manipulation"
+documentation = "https://staktrace.github.io/maildir/target/doc/maildir/"
+homepage = "https://github.com/staktrace/maildir/blob/master/README.md"
+repository = "https://github.com/staktrace/maildir"
+readme = "README.md"
+keywords = ["maildir", "email", "rfc822", "mime"]
+license-file = "LICENSE"
 
 [dependencies]
-mailparse = "0.3.0"
+mailparse = "0.5.0"
