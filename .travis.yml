@@ -6,5 +6,7 @@ rust:
 matrix:
   allow_failures:
     - rust: nightly
+env:
+  - RUST_TEST_THREADS=1 RUST_TEST_TASKS=1
 notifications:
   email: false
