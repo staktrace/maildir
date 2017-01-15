@@ -317,15 +317,33 @@ mod tests {
 
     use mailparse::MailHeaderMap;
 
+    // `cargo package` doesn't package files with colons in the
+    // name, so we have to resort to naming it something else
+    // and renaming for the tests. Talk about ugly!
+    fn setup() {
+        fs::rename("testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184_2_S",
+                   "testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184:2,S")
+            .unwrap();
+    }
+
+    fn teardown() {
+        fs::rename("testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184:2,S",
+                   "testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184_2_S")
+            .unwrap();
+    }
+
     #[test]
     fn maildir_count() {
+        setup();
         let maildir = Maildir::from("testdata/maildir1");
         assert_eq!(maildir.count_cur(), 1);
         assert_eq!(maildir.count_new(), 1);
+        teardown();
     }
 
     #[test]
     fn maildir_list() {
+        setup();
         let maildir = Maildir::from("testdata/maildir1");
         let mut iter = maildir.list_new();
         let mut first = iter.next().unwrap().unwrap();
@@ -344,20 +362,24 @@ mod tests {
         assert_eq!(first.is_seen(), true);
         let second = iter.next();
         assert!(second.is_none());
+        teardown();
     }
 
     #[test]
     fn maildir_find() {
+        setup();
         let maildir = Maildir::from("testdata/maildir1");
         assert_eq!(maildir.find("bad_id").is_some(), false);
         assert_eq!(maildir.find("1463941010.5f7fa6dd4922c183dc457d033deee9d7").is_some(),
                    true);
         assert_eq!(maildir.find("1463868505.38518452d49213cb409aa1db32f53184").is_some(),
                    true);
+        teardown();
     }
 
     #[test]
     fn mark_read() {
+        setup();
         let maildir = Maildir::from("testdata/maildir1");
         assert_eq!(maildir.move_new_to_cur("1463941010.5f7fa6dd4922c183dc457d033deee9d7").unwrap(),
                    ());
@@ -365,13 +387,16 @@ mod tests {
         fs::rename("testdata/maildir1/cur/1463941010.5f7fa6dd4922c183dc457d033deee9d7:2,",
                    "testdata/maildir1/new/1463941010.5f7fa6dd4922c183dc457d033deee9d7")
             .unwrap();
+        teardown();
     }
 
     #[test]
     fn check_received() {
+        setup();
         let maildir = Maildir::from("testdata/maildir1");
         let mut iter = maildir.list_cur();
         let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.received().unwrap(), 1463868507);
+        teardown();
     }
 }
