@@ -112,7 +112,7 @@ impl MailEntry {
                 }
                 try!(Err("Unable to split Received header"))
             }
-            None => try!(Err("No Received header found"))
+            None => try!(Err("No Received header found")),
         }
     }
 
