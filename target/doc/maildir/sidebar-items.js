@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["MailEntryError",""]],"struct":[["MailEntries",""],["MailEntry",""],["Maildir",""]]});
