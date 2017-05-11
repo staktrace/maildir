@@ -1,11 +1,15 @@
 extern crate mailparse;
+extern crate nix;
 
 use std::error;
 use std::fmt;
 use std::fs;
 use std::io::prelude::*;
+use std::os::unix::fs::MetadataExt;
 use std::ops::Deref;
 use std::path::PathBuf;
+use std::thread;
+use std::time;
 
 use mailparse::*;
 
@@ -288,6 +292,66 @@ impl Maildir {
         };
 
         self.list_new().find(&filter).or_else(|| self.list_cur().find(&filter)).map(|e| e.unwrap())
+    }
+
+    /// Creates all neccessary directories if they don't exist yet. It is the library user's
+    /// responsibility to call this before using `store_new`.
+    pub fn create_dirs(&self) -> std::io::Result<()> {
+        let mut path = self.path.clone();
+        for d in vec!["cur", "new", "tmp"] {
+            path.push(d);
+            fs::create_dir_all(path.as_path())?;
+            path.pop();
+        }
+        Ok( () )
+    }
+
+    /// Stores the given message data as a new message file in the Maildir `new` folder. Does not
+    /// create the neccessary directories, so if in doubt call `create_dirs` before using
+    /// `store_new`.
+    pub fn store_new<E>(&self, data: &[u8]) -> std::result::Result<(), E>
+        where
+            E: From<std::str::Utf8Error> + From<std::io::Error> + From<nix::Error> + From<std::time::SystemTimeError> {
+
+        // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
+        // dovecot and courier IMAP use <timestamp>.M<usec>P<pid>.<hostname> for tmp-files and then
+        // move to <timestamp>.M<usec>P<pid>V<dev>I<ino>.<hostname>,S=<size_in_bytes> when moving
+        // to new dir. see for example http://www.courier-mta.org/maildir.html
+        let pid = nix::unistd::getpid();
+
+        // note: gethostname(2) says that 64 bytes is the de-facto limit on linux, SUSv2 says limit
+        // is 255.
+        let mut hostname_buf = [0u8; 255];
+        let hostname_cstr = nix::unistd::gethostname(&mut hostname_buf)?;
+        let hostname = hostname_cstr.to_str()?;
+
+        // loop when conflicting filenames occur, as described at
+        // http://www.courier-mta.org/maildir.html
+        // this assumes that pid and hostname don't change.
+        let mut ts;
+        let mut tmppath = self.path.clone();
+        tmppath.push("tmp");
+        loop {
+            ts = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
+            tmppath.push(format!("{}.M{}P{}.{}", ts.as_secs(), ts.subsec_nanos(), pid, hostname));
+            if !tmppath.exists() {
+                break;
+            }
+            tmppath.pop();
+            thread::sleep(time::Duration::from_millis(10));
+        }
+
+        let mut file = std::fs::File::create(tmppath.to_owned())?;
+        file.write_all(data)?;
+        file.sync_all()?;
+
+        let meta = file.metadata()?;
+        let mut newpath = self.path.clone();
+        newpath.push("new");
+        newpath.push(format!("{}.M{}P{}V{}I{}.{},S={}", ts.as_secs(), ts.subsec_nanos(), pid, meta.dev(), meta.ino(), hostname, meta.size()));
+        std::fs::rename(tmppath, newpath)?;
+
+        Ok( () )
     }
 }
 
