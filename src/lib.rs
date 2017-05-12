@@ -230,6 +230,72 @@ impl Iterator for MailEntries {
     }
 }
 
+#[derive(Debug)]
+pub enum MaildirError {
+    Io(std::io::Error),
+    Utf8(std::str::Utf8Error),
+    Nix(nix::Error),
+    Time(std::time::SystemTimeError),
+}
+
+impl fmt::Display for MaildirError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use MaildirError::*;
+
+        match *self {
+            Io(ref e)   => write!(f, "IO Error: {}", e),
+            Utf8(ref e) => write!(f, "UTF8 Encoding Error: {}", e),
+            Nix(ref e)  => write!(f, "nix library Error: {}", e),
+            Time(ref e) => write!(f, "Time Error: {}", e),
+        }
+    }
+}
+
+impl error::Error for MaildirError {
+    fn description(&self) -> &str {
+        use MaildirError::*;
+
+        match *self {
+            Io(ref e)   => e.description(),
+            Utf8(ref e) => e.description(),
+            Nix(ref e)  => e.description(),
+            Time(ref e) => e.description(),
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        use MaildirError::*;
+
+        match *self {
+            Io(ref e)   => Some(e),
+            Utf8(ref e) => Some(e),
+            Nix(ref e)  => Some(e),
+            Time(ref e) => Some(e),
+        }
+    }
+}
+
+impl From<std::io::Error> for MaildirError {
+    fn from(e: std::io::Error) -> MaildirError {
+        MaildirError::Io(e)
+    }
+}
+impl From<std::str::Utf8Error> for MaildirError {
+    fn from(e: std::str::Utf8Error) -> MaildirError {
+        MaildirError::Utf8(e)
+    }
+}
+impl From<nix::Error> for MaildirError {
+    fn from(e: nix::Error) -> MaildirError {
+        MaildirError::Nix(e)
+    }
+}
+impl From<std::time::SystemTimeError> for MaildirError {
+    fn from(e: std::time::SystemTimeError) -> MaildirError {
+        MaildirError::Time(e)
+    }
+}
+
 /// The main entry point for this library. This struct can be
 /// instantiated from a path using the `from` implementations.
 /// The path passed in to the `from` should be the root of the
@@ -309,10 +375,7 @@ impl Maildir {
     /// Stores the given message data as a new message file in the Maildir `new` folder. Does not
     /// create the neccessary directories, so if in doubt call `create_dirs` before using
     /// `store_new`.
-    pub fn store_new<E>(&self, data: &[u8]) -> std::result::Result<(), E>
-        where
-            E: From<std::str::Utf8Error> + From<std::io::Error> + From<nix::Error> + From<std::time::SystemTimeError> {
-
+    pub fn store_new(&self, data: &[u8]) -> std::result::Result<(), MaildirError> {
         // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
         // dovecot and courier IMAP use <timestamp>.M<usec>P<pid>.<hostname> for tmp-files and then
         // move to <timestamp>.M<usec>P<pid>V<dev>I<ino>.<hostname>,S=<size_in_bytes> when moving
@@ -488,7 +551,7 @@ mod tests {
         maildir.create_dirs().unwrap();
 
         assert_eq!(maildir.count_new(), 0);
-        maildir.store_new::<Box<std::error::Error>>("Return-Path: <of82ecuq@cip.cs.fau.de>
+        maildir.store_new("Return-Path: <of82ecuq@cip.cs.fau.de>
 X-Original-To: of82ecuq@cip.cs.fau.de
 Delivered-To: of82ecuq@cip.cs.fau.de
 Received: from faui0fl.informatik.uni-erlangen.de (unknown [IPv6:2001:638:a000:4160:131:188:60:117])
