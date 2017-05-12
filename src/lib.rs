@@ -378,6 +378,7 @@ mod tests {
     use super::*;
 
     use std::fs;
+    use std::path::*;
 
     use mailparse::MailHeaderMap;
 
@@ -462,5 +463,51 @@ mod tests {
         let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.received().unwrap(), 1463868507);
         teardown();
+    }
+
+    #[test]
+    fn check_create_dirs() {
+        let maildir = Maildir::from("testdata/maildir2");
+        assert!(!Path::new("testdata/maildir2").exists());
+        assert!(!Path::new("testdata/maildir2/cur").exists());
+        assert!(!Path::new("testdata/maildir2/new").exists());
+        assert!(!Path::new("testdata/maildir2/tmp").exists());
+
+        maildir.create_dirs().unwrap();
+        assert!(Path::new("testdata/maildir2").exists());
+        assert!(Path::new("testdata/maildir2/cur").exists());
+        assert!(Path::new("testdata/maildir2/new").exists());
+        assert!(Path::new("testdata/maildir2/tmp").exists());
+
+        fs::remove_dir_all("testdata/maildir2").unwrap();
+    }
+
+    #[test]
+    fn check_store_new() {
+        let maildir = Maildir::from("testdata/maildir2");
+        maildir.create_dirs().unwrap();
+
+        assert_eq!(maildir.count_new(), 0);
+        maildir.store_new::<Box<std::error::Error>>("Return-Path: <of82ecuq@cip.cs.fau.de>
+X-Original-To: of82ecuq@cip.cs.fau.de
+Delivered-To: of82ecuq@cip.cs.fau.de
+Received: from faui0fl.informatik.uni-erlangen.de (unknown [IPv6:2001:638:a000:4160:131:188:60:117])
+        by faui03.informatik.uni-erlangen.de (Postfix) with ESMTP id 466C1240A3D
+        for <of82ecuq@cip.cs.fau.de>; Fri, 12 May 2017 10:09:45 +0000 (UTC)
+Received: by faui0fl.informatik.uni-erlangen.de (Postfix, from userid 303135)
+        id 389CC10E1A32; Fri, 12 May 2017 12:09:45 +0200 (CEST)
+To: of82ecuq@cip.cs.fau.de
+MIME-Version: 1.0
+Content-Type: text/plain; charset=\"UTF-8\"
+Content-Transfer-Encoding: 8bit
+Message-Id: <20170512100945.389CC10E1A32@faui0fl.informatik.uni-erlangen.de>
+Date: Fri, 12 May 2017 12:09:45 +0200 (CEST)
+From: of82ecuq@cip.cs.fau.de (Johannes Schilling)
+Subject: maildir delivery test mail
+
+Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_bytes()).unwrap();
+        assert_eq!(maildir.count_new(), 1);
+
+        fs::remove_dir_all("testdata/maildir2").unwrap();
     }
 }
