@@ -376,6 +376,17 @@ impl Maildir {
     /// create the neccessary directories, so if in doubt call `create_dirs` before using
     /// `store_new`.
     pub fn store_new(&self, data: &[u8]) -> std::result::Result<(), MaildirError> {
+        self.store(Subfolder::New, data, "")
+    }
+
+    /// Stores the given message data as a new message file in the Maildir `cur` folder, adding the
+    /// given `flags` to it. The possible flags are explained e.g. at
+    /// <https://cr.yp.to/proto/maildir.html> or <http://www.courier-mta.org/maildir.html>.
+    pub fn store_cur_with_flags(&self, data: &[u8], flags: &str) -> std::result::Result<(), MaildirError> {
+        self.store(Subfolder::Cur, data, &format!(":2,{}", flags))
+    }
+
+    fn store(&self, subfolder: Subfolder, data: &[u8], flags: &str) -> std::result::Result<(), MaildirError> {
         // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
         // dovecot and courier IMAP use <timestamp>.M<usec>P<pid>.<hostname> for tmp-files and then
         // move to <timestamp>.M<usec>P<pid>V<dev>I<ino>.<hostname>,S=<size_in_bytes> when moving
@@ -410,8 +421,11 @@ impl Maildir {
 
         let meta = file.metadata()?;
         let mut newpath = self.path.clone();
-        newpath.push("new");
-        newpath.push(format!("{}.M{}P{}V{}I{}.{},S={}", ts.as_secs(), ts.subsec_nanos(), pid, meta.dev(), meta.ino(), hostname, meta.size()));
+        newpath.push(match subfolder {
+            Subfolder::New => "new",
+            Subfolder::Cur => "cur",
+        });
+        newpath.push(format!("{}.M{}P{}V{}I{}.{},S={}{}", ts.as_secs(), ts.subsec_nanos(), pid, meta.dev(), meta.ino(), hostname, meta.size(), flags));
         std::fs::rename(tmppath, newpath)?;
 
         Ok( () )
@@ -545,13 +559,8 @@ mod tests {
         fs::remove_dir_all("testdata/maildir2").unwrap();
     }
 
-    #[test]
-    fn check_store_new() {
-        let maildir = Maildir::from("testdata/maildir2");
-        maildir.create_dirs().unwrap();
 
-        assert_eq!(maildir.count_new(), 0);
-        maildir.store_new("Return-Path: <of82ecuq@cip.cs.fau.de>
+    const TEST_MAIL_BODY : &'static [u8] = b"Return-Path: <of82ecuq@cip.cs.fau.de>
 X-Original-To: of82ecuq@cip.cs.fau.de
 Delivered-To: of82ecuq@cip.cs.fau.de
 Received: from faui0fl.informatik.uni-erlangen.de (unknown [IPv6:2001:638:a000:4160:131:188:60:117])
@@ -568,8 +577,33 @@ Date: Fri, 12 May 2017 12:09:45 +0200 (CEST)
 From: of82ecuq@cip.cs.fau.de (Johannes Schilling)
 Subject: maildir delivery test mail
 
-Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_bytes()).unwrap();
+Today is Boomtime, the 59th day of Discord in the YOLD 3183";
+
+    #[test]
+    fn check_store_new() {
+        let maildir = Maildir::from("testdata/maildir2");
+        maildir.create_dirs().unwrap();
+
+        assert_eq!(maildir.count_new(), 0);
+        maildir.store_new(TEST_MAIL_BODY).unwrap();
         assert_eq!(maildir.count_new(), 1);
+
+        fs::remove_dir_all("testdata/maildir2").unwrap();
+    }
+
+    #[test]
+    fn check_store_cur() {
+        let maildir = Maildir::from("testdata/maildir2");
+        maildir.create_dirs().unwrap();
+        let testflags = "FRS";
+
+        assert_eq!(maildir.count_cur(), 0);
+        maildir.store_cur_with_flags(TEST_MAIL_BODY, testflags).unwrap();
+        assert_eq!(maildir.count_cur(), 1);
+
+        let mut iter = maildir.list_cur();
+        let first = iter.next().unwrap().unwrap();
+        assert_eq!(first.flags(), testflags);
 
         fs::remove_dir_all("testdata/maildir2").unwrap();
     }
