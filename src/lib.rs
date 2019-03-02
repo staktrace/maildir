@@ -147,6 +147,10 @@ impl MailEntry {
     pub fn is_trashed(&self) -> bool {
         self.flags.contains('T')
     }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
 }
 
 enum Subfolder {
