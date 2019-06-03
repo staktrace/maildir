@@ -1,13 +1,6 @@
 use maildir::MailEntry;
 use maildir::Maildir;
-use std::path::PathBuf;
-
-fn unwrap_mail(mail: ::std::io::Result<MailEntry>) -> MailEntry {
-    mail.unwrap_or_else(|e| {
-        eprintln!("Error: {:?}", e);
-        ::std::process::exit(1);
-    })
-}
+use std::io;
 
 fn list_mail(mail: MailEntry) {
     println!("Path:         {}", mail.path().display());
@@ -21,15 +14,22 @@ fn list_mail(mail: MailEntry) {
     println!("is_trashed:   {}", mail.is_trashed());
 }
 
-fn main() {
-    // not sure whether this is actually fast or something, but we don't care here, do we?
-    ::std::env::args()
-        .skip(1)
-        .map(PathBuf::from)
-        .map(Maildir::from)
-        .for_each(|mdir| {
-            mdir.list_new().map(unwrap_mail).for_each(list_mail);
+fn process_maildirs(maildirs: impl IntoIterator<Item = Maildir>) -> Result<(), io::Error> {
+    maildirs.into_iter().try_for_each(|mdir| {
+        mdir.list_new()
+            .chain(mdir.list_cur())
+            .map(|r| r.map(list_mail))
+            .collect::<Result<_, _>>()
+    })
+}
 
-            mdir.list_cur().map(unwrap_mail).for_each(list_mail);
-        });
+fn main() {
+    let rc = match process_maildirs(std::env::args().skip(1).map(Into::into)) {
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
+            1
+        }
+        Ok(_) => 0,
+    };
+    std::process::exit(rc);
 }
