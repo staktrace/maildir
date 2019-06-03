@@ -1,8 +1,8 @@
 extern crate maildir;
 
-use std::path::PathBuf;
-use maildir::Maildir;
 use maildir::MailEntry;
+use maildir::Maildir;
+use std::path::PathBuf;
 
 fn unwrap_mail(mail: ::std::io::Result<MailEntry>) -> MailEntry {
     mail.unwrap_or_else(|e| {
@@ -30,12 +30,8 @@ fn main() {
         .map(PathBuf::from)
         .map(Maildir::from)
         .for_each(|mdir| {
-            mdir.list_new()
-                .map(unwrap_mail)
-                .for_each(list_mail);
+            mdir.list_new().map(unwrap_mail).for_each(list_mail);
 
-            mdir.list_cur()
-                .map(unwrap_mail)
-                .for_each(list_mail);
+            mdir.list_cur().map(unwrap_mail).for_each(list_mail);
         });
 }

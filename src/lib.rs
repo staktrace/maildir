@@ -5,8 +5,8 @@ use std::error;
 use std::fmt;
 use std::fs;
 use std::io::prelude::*;
-use std::os::unix::fs::MetadataExt;
 use std::ops::Deref;
+use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::thread;
 use std::time;
@@ -214,8 +214,10 @@ impl Iterator for MailEntries {
                     }
                 };
                 if id.is_none() || flags.is_none() {
-                    return Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
-                                                   "Non-maildir file found in maildir"));
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Non-maildir file found in maildir",
+                    ));
                 }
                 Ok(Some(MailEntry {
                     id: String::from(id.unwrap()),
@@ -247,9 +249,9 @@ impl fmt::Display for MaildirError {
         use MaildirError::*;
 
         match *self {
-            Io(ref e)   => write!(f, "IO Error: {}", e),
+            Io(ref e) => write!(f, "IO Error: {}", e),
             Utf8(ref e) => write!(f, "UTF8 Encoding Error: {}", e),
-            Nix(ref e)  => write!(f, "nix library Error: {}", e),
+            Nix(ref e) => write!(f, "nix library Error: {}", e),
             Time(ref e) => write!(f, "Time Error: {}", e),
         }
     }
@@ -260,9 +262,9 @@ impl error::Error for MaildirError {
         use MaildirError::*;
 
         match *self {
-            Io(ref e)   => e.description(),
+            Io(ref e) => e.description(),
             Utf8(ref e) => e.description(),
-            Nix(ref e)  => e.description(),
+            Nix(ref e) => e.description(),
             Time(ref e) => e.description(),
         }
     }
@@ -271,9 +273,9 @@ impl error::Error for MaildirError {
         use MaildirError::*;
 
         match *self {
-            Io(ref e)   => Some(e),
+            Io(ref e) => Some(e),
             Utf8(ref e) => Some(e),
-            Nix(ref e)  => Some(e),
+            Nix(ref e) => Some(e),
             Time(ref e) => Some(e),
         }
     }
@@ -354,14 +356,15 @@ impl Maildir {
     /// maildir. This searches both the `new` and the `cur`
     /// folders.
     pub fn find(&self, id: &str) -> Option<MailEntry> {
-        let filter = |entry: &std::io::Result<MailEntry>| {
-            match *entry {
-                Err(_) => false,
-                Ok(ref e) => e.id() == id,
-            }
+        let filter = |entry: &std::io::Result<MailEntry>| match *entry {
+            Err(_) => false,
+            Ok(ref e) => e.id() == id,
         };
 
-        self.list_new().find(&filter).or_else(|| self.list_cur().find(&filter)).map(|e| e.unwrap())
+        self.list_new()
+            .find(&filter)
+            .or_else(|| self.list_cur().find(&filter))
+            .map(|e| e.unwrap())
     }
 
     /// Creates all neccessary directories if they don't exist yet. It is the library user's
@@ -373,7 +376,7 @@ impl Maildir {
             fs::create_dir_all(path.as_path())?;
             path.pop();
         }
-        Ok( () )
+        Ok(())
     }
 
     /// Stores the given message data as a new message file in the Maildir `new` folder. Does not
@@ -386,11 +389,20 @@ impl Maildir {
     /// Stores the given message data as a new message file in the Maildir `cur` folder, adding the
     /// given `flags` to it. The possible flags are explained e.g. at
     /// <https://cr.yp.to/proto/maildir.html> or <http://www.courier-mta.org/maildir.html>.
-    pub fn store_cur_with_flags(&self, data: &[u8], flags: &str) -> std::result::Result<(), MaildirError> {
+    pub fn store_cur_with_flags(
+        &self,
+        data: &[u8],
+        flags: &str,
+    ) -> std::result::Result<(), MaildirError> {
         self.store(Subfolder::Cur, data, &format!(":2,{}", flags))
     }
 
-    fn store(&self, subfolder: Subfolder, data: &[u8], flags: &str) -> std::result::Result<(), MaildirError> {
+    fn store(
+        &self,
+        subfolder: Subfolder,
+        data: &[u8],
+        flags: &str,
+    ) -> std::result::Result<(), MaildirError> {
         // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
         // dovecot and courier IMAP use <timestamp>.M<usec>P<pid>.<hostname> for tmp-files and then
         // move to <timestamp>.M<usec>P<pid>V<dev>I<ino>.<hostname>,S=<size_in_bytes> when moving
@@ -411,7 +423,13 @@ impl Maildir {
         tmppath.push("tmp");
         loop {
             ts = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
-            tmppath.push(format!("{}.M{}P{}.{}", ts.as_secs(), ts.subsec_nanos(), pid, hostname));
+            tmppath.push(format!(
+                "{}.M{}P{}.{}",
+                ts.as_secs(),
+                ts.subsec_nanos(),
+                pid,
+                hostname
+            ));
             if !tmppath.exists() {
                 break;
             }
@@ -429,10 +447,20 @@ impl Maildir {
             Subfolder::New => "new",
             Subfolder::Cur => "cur",
         });
-        newpath.push(format!("{}.M{}P{}V{}I{}.{},S={}{}", ts.as_secs(), ts.subsec_nanos(), pid, meta.dev(), meta.ino(), hostname, meta.size(), flags));
+        newpath.push(format!(
+            "{}.M{}P{}V{}I{}.{},S={}{}",
+            ts.as_secs(),
+            ts.subsec_nanos(),
+            pid,
+            meta.dev(),
+            meta.ino(),
+            hostname,
+            meta.size(),
+            flags
+        ));
         std::fs::rename(tmppath, newpath)?;
 
-        Ok( () )
+        Ok(())
     }
 }
 
@@ -467,15 +495,19 @@ mod tests {
     // name, so we have to resort to naming it something else
     // and renaming for the tests. Talk about ugly!
     fn setup() {
-        fs::rename("testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184_2_S",
-                   "testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184:2,S")
-            .unwrap();
+        fs::rename(
+            "testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184_2_S",
+            "testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184:2,S",
+        )
+        .unwrap();
     }
 
     fn teardown() {
-        fs::rename("testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184:2,S",
-                   "testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184_2_S")
-            .unwrap();
+        fs::rename(
+            "testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184:2,S",
+            "testdata/maildir1/cur/1463868505.38518452d49213cb409aa1db32f53184_2_S",
+        )
+        .unwrap();
     }
 
     #[test]
@@ -494,8 +526,10 @@ mod tests {
         let mut iter = maildir.list_new();
         let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463941010.5f7fa6dd4922c183dc457d033deee9d7");
-        assert_eq!(first.headers().unwrap().get_first_value("Subject").unwrap(),
-                   Some(String::from("test")));
+        assert_eq!(
+            first.headers().unwrap().get_first_value("Subject").unwrap(),
+            Some(String::from("test"))
+        );
         assert_eq!(first.is_seen(), false);
         let second = iter.next();
         assert!(second.is_none());
@@ -503,8 +537,15 @@ mod tests {
         let mut iter = maildir.list_cur();
         let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463868505.38518452d49213cb409aa1db32f53184");
-        assert_eq!(first.parsed().unwrap().headers.get_first_value("Subject").unwrap(),
-                   Some(String::from("test")));
+        assert_eq!(
+            first
+                .parsed()
+                .unwrap()
+                .headers
+                .get_first_value("Subject")
+                .unwrap(),
+            Some(String::from("test"))
+        );
         assert_eq!(first.is_seen(), true);
         let second = iter.next();
         assert!(second.is_none());
@@ -516,10 +557,18 @@ mod tests {
         setup();
         let maildir = Maildir::from("testdata/maildir1");
         assert_eq!(maildir.find("bad_id").is_some(), false);
-        assert_eq!(maildir.find("1463941010.5f7fa6dd4922c183dc457d033deee9d7").is_some(),
-                   true);
-        assert_eq!(maildir.find("1463868505.38518452d49213cb409aa1db32f53184").is_some(),
-                   true);
+        assert_eq!(
+            maildir
+                .find("1463941010.5f7fa6dd4922c183dc457d033deee9d7")
+                .is_some(),
+            true
+        );
+        assert_eq!(
+            maildir
+                .find("1463868505.38518452d49213cb409aa1db32f53184")
+                .is_some(),
+            true
+        );
         teardown();
     }
 
@@ -527,12 +576,18 @@ mod tests {
     fn mark_read() {
         setup();
         let maildir = Maildir::from("testdata/maildir1");
-        assert_eq!(maildir.move_new_to_cur("1463941010.5f7fa6dd4922c183dc457d033deee9d7").unwrap(),
-                   ());
+        assert_eq!(
+            maildir
+                .move_new_to_cur("1463941010.5f7fa6dd4922c183dc457d033deee9d7")
+                .unwrap(),
+            ()
+        );
         // Reset the filesystem
-        fs::rename("testdata/maildir1/cur/1463941010.5f7fa6dd4922c183dc457d033deee9d7:2,",
-                   "testdata/maildir1/new/1463941010.5f7fa6dd4922c183dc457d033deee9d7")
-            .unwrap();
+        fs::rename(
+            "testdata/maildir1/cur/1463941010.5f7fa6dd4922c183dc457d033deee9d7:2,",
+            "testdata/maildir1/new/1463941010.5f7fa6dd4922c183dc457d033deee9d7",
+        )
+        .unwrap();
         teardown();
     }
 
@@ -563,8 +618,7 @@ mod tests {
         fs::remove_dir_all("testdata/maildir2").unwrap();
     }
 
-
-    const TEST_MAIL_BODY : &'static [u8] = b"Return-Path: <of82ecuq@cip.cs.fau.de>
+    const TEST_MAIL_BODY: &'static [u8] = b"Return-Path: <of82ecuq@cip.cs.fau.de>
 X-Original-To: of82ecuq@cip.cs.fau.de
 Delivered-To: of82ecuq@cip.cs.fau.de
 Received: from faui0fl.informatik.uni-erlangen.de (unknown [IPv6:2001:638:a000:4160:131:188:60:117])
@@ -602,7 +656,9 @@ Today is Boomtime, the 59th day of Discord in the YOLD 3183";
         let testflags = "FRS";
 
         assert_eq!(maildir.count_cur(), 0);
-        maildir.store_cur_with_flags(TEST_MAIL_BODY, testflags).unwrap();
+        maildir
+            .store_cur_with_flags(TEST_MAIL_BODY, testflags)
+            .unwrap();
         assert_eq!(maildir.count_cur(), 1);
 
         let mut iter = maildir.list_cur();
