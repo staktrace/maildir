@@ -4,7 +4,7 @@ use std::fs;
 use std::io::prelude::*;
 use std::ops::Deref;
 use std::os::unix::fs::MetadataExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time;
 
@@ -308,6 +308,11 @@ pub struct Maildir {
 }
 
 impl Maildir {
+    /// Returns the path of the maildir base folder.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     /// Returns the number of messages found inside the `new`
     /// maildir folder.
     pub fn count_new(&self) -> usize {
