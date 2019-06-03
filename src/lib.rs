@@ -92,14 +92,14 @@ impl MailEntry {
 
     pub fn parsed(&mut self) -> Result<ParsedMail, MailEntryError> {
         self.read_data()?;
-        parse_mail(self.data.as_ref().unwrap()).map_err(|e| MailEntryError::ParseError(e))
+        parse_mail(self.data.as_ref().unwrap()).map_err(MailEntryError::ParseError)
     }
 
     pub fn headers(&mut self) -> Result<Vec<MailHeader>, MailEntryError> {
         self.read_data()?;
         parse_headers(self.data.as_ref().unwrap())
             .map(|(v, _)| v)
-            .map_err(|e| MailEntryError::ParseError(e))
+            .map_err(MailEntryError::ParseError)
     }
 
     pub fn received(&mut self) -> Result<i64, MailEntryError> {
@@ -107,12 +107,12 @@ impl MailEntry {
         let headers = self.headers()?;
         let received = headers.get_first_value("Received")?;
         match received {
-            Some(v) => {
-                for ts in v.rsplit(';') {
-                    return dateparse(ts).map_err(MailEntryError::from);
-                }
-                Err("Unable to split Received header")?
-            }
+            Some(v) => v
+                .rsplit(';')
+                .nth(0)
+                .ok_or_else(|| "Unable to split Received header")
+                .and_then(|ts| dateparse(ts))
+                .map_err(MailEntryError::from),
             None => Err("No Received header found")?,
         }
     }
@@ -171,8 +171,8 @@ pub struct MailEntries {
 impl MailEntries {
     fn new(path: PathBuf, subfolder: Subfolder) -> MailEntries {
         MailEntries {
-            path: path,
-            subfolder: subfolder,
+            path,
+            subfolder,
             readdir: None,
         }
     }
@@ -200,7 +200,7 @@ impl Iterator for MailEntries {
             let result = dir_entry.map(|e| {
                 let entry = e?;
                 let filename = String::from(entry.file_name().to_string_lossy().deref());
-                if filename.starts_with(".") {
+                if filename.starts_with('.') {
                     return Ok(None);
                 }
                 let (id, flags) = match self.subfolder {
@@ -368,7 +368,7 @@ impl Maildir {
     /// responsibility to call this before using `store_new`.
     pub fn create_dirs(&self) -> std::io::Result<()> {
         let mut path = self.path.clone();
-        for d in vec!["cur", "new", "tmp"] {
+        for d in &["cur", "new", "tmp"] {
             path.push(d);
             fs::create_dir_all(path.as_path())?;
             path.pop();
@@ -594,7 +594,7 @@ mod tests {
         let maildir = Maildir::from("testdata/maildir1");
         let mut iter = maildir.list_cur();
         let mut first = iter.next().unwrap().unwrap();
-        assert_eq!(first.received().unwrap(), 1463868507);
+        assert_eq!(first.received().unwrap(), 1_463_868_507);
         teardown();
     }
 
@@ -615,7 +615,7 @@ mod tests {
         fs::remove_dir_all("testdata/maildir2").unwrap();
     }
 
-    const TEST_MAIL_BODY: &'static [u8] = b"Return-Path: <of82ecuq@cip.cs.fau.de>
+    const TEST_MAIL_BODY: &[u8] = b"Return-Path: <of82ecuq@cip.cs.fau.de>
 X-Original-To: of82ecuq@cip.cs.fau.de
 Delivered-To: of82ecuq@cip.cs.fau.de
 Received: from faui0fl.informatik.uni-erlangen.de (unknown [IPv6:2001:638:a000:4160:131:188:60:117])

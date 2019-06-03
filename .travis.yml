@@ -14,6 +14,12 @@ matrix:
         - rustup component add rustfmt
       script:
         - cargo fmt -v -- --check
+    - name: "Rust: clippy"
+      rust: stable
+      install:
+        - rustup component add clippy
+      script:
+        - cargo clippy --all-features --all-targets -- -D warnings
 
 env:
   - RUST_TEST_THREADS=1 RUST_TEST_TASKS=1
