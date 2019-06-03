@@ -85,38 +85,38 @@ impl MailEntry {
 
     fn read_data(&mut self) -> std::io::Result<()> {
         if self.data.is_none() {
-            let mut f = try!(fs::File::open(self.path.clone()));
+            let mut f = fs::File::open(self.path.clone())?;
             let mut d = Vec::<u8>::new();
-            try!(f.read_to_end(&mut d));
+            f.read_to_end(&mut d)?;
             self.data = Some(d);
         }
         Ok(())
     }
 
     pub fn parsed(&mut self) -> Result<ParsedMail, MailEntryError> {
-        try!(self.read_data());
+        self.read_data()?;
         parse_mail(self.data.as_ref().unwrap()).map_err(|e| MailEntryError::ParseError(e))
     }
 
     pub fn headers(&mut self) -> Result<Vec<MailHeader>, MailEntryError> {
-        try!(self.read_data());
+        self.read_data()?;
         parse_headers(self.data.as_ref().unwrap())
             .map(|(v, _)| v)
             .map_err(|e| MailEntryError::ParseError(e))
     }
 
     pub fn received(&mut self) -> Result<i64, MailEntryError> {
-        try!(self.read_data());
-        let headers = try!(self.headers());
-        let received = try!(headers.get_first_value("Received"));
+        self.read_data()?;
+        let headers = self.headers()?;
+        let received = headers.get_first_value("Received")?;
         match received {
             Some(v) => {
                 for ts in v.rsplit(';') {
                     return dateparse(ts).map_err(MailEntryError::from);
                 }
-                try!(Err("Unable to split Received header"))
+                Err("Unable to split Received header")?
             }
-            None => try!(Err("No Received header found")),
+            None => Err("No Received header found")?,
         }
     }
 
@@ -201,7 +201,7 @@ impl Iterator for MailEntries {
             // we need to skip over files starting with a '.'
             let dir_entry = self.readdir.iter_mut().next().unwrap().next();
             let result = dir_entry.map(|e| {
-                let entry = try!(e);
+                let entry = e?;
                 let filename = String::from(entry.file_name().to_string_lossy().deref());
                 if filename.starts_with(".") {
                     return Ok(None);
