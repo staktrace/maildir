@@ -1,5 +1,3 @@
-extern crate maildir;
-
 use maildir::MailEntry;
 use maildir::Maildir;
 use std::path::PathBuf;
