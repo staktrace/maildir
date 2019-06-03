@@ -36,7 +36,7 @@ impl error::Error for MailEntryError {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             MailEntryError::IOError(ref err) => Some(err),
             MailEntryError::ParseError(ref err) => Some(err),
@@ -266,7 +266,7 @@ impl error::Error for MaildirError {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         use MaildirError::*;
 
         match *self {
