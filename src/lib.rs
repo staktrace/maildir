@@ -1,6 +1,3 @@
-extern crate mailparse;
-extern crate nix;
-
 use std::error;
 use std::fmt;
 use std::fs;

@@ -11,6 +11,7 @@ keywords = ["maildir", "email", "rfc822", "mime"]
 categories = ["email", "filesystem"]
 license = "0BSD"
 exclude = ["target/doc/**", ".gitattributes"]
+edition = "2018"
 
 [badges]
 travis-ci = { repository = "staktrace/maildir", branch = "master" }
