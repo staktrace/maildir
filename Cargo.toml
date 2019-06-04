@@ -17,8 +17,8 @@ edition = "2018"
 travis-ci = { repository = "staktrace/maildir", branch = "master" }
 
 [dependencies]
-mailparse = "0.6"
-nix  = "^0.8"
+mailparse = "0.8"
+nix  = "0.14"
 
 [dev-dependencies]
 tempfile = "3.0.8"
