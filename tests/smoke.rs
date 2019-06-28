@@ -167,8 +167,18 @@ fn check_store_new() {
         maildir.create_dirs().unwrap();
 
         assert_eq!(maildir.count_new(), 0);
-        maildir.store_new(TEST_MAIL_BODY).unwrap();
+        let id = maildir.store_new(TEST_MAIL_BODY);
+        assert!(id.is_ok());
         assert_eq!(maildir.count_new(), 1);
+
+        let id = id.unwrap();
+        let msg = maildir.find(&id);
+        assert!(msg.is_some());
+
+        assert_eq!(
+            msg.unwrap().parsed().unwrap().get_body_raw().unwrap(),
+            "Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_bytes()
+        );
     });
 }
 
