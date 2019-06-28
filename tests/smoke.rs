@@ -143,23 +143,23 @@ fn check_create_dirs() {
 }
 
 const TEST_MAIL_BODY: &[u8] = b"Return-Path: <of82ecuq@cip.cs.fau.de>
-iginal-To: of82ecuq@cip.cs.fau.de
-vered-To: of82ecuq@cip.cs.fau.de
-ived: from faui0fl.informatik.uni-erlangen.de (unknown [IPv6:2001:638:a000:4160:131:188:60:117])
-    by faui03.informatik.uni-erlangen.de (Postfix) with ESMTP id 466C1240A3D
-    for <of82ecuq@cip.cs.fau.de>; Fri, 12 May 2017 10:09:45 +0000 (UTC)
-ived: by faui0fl.informatik.uni-erlangen.de (Postfix, from userid 303135)
-    id 389CC10E1A32; Fri, 12 May 2017 12:09:45 +0200 (CEST)
-of82ecuq@cip.cs.fau.de
--Version: 1.0
-ent-Type: text/plain; charset=\"UTF-8\"
-ent-Transfer-Encoding: 8bit
-age-Id: <20170512100945.389CC10E1A32@faui0fl.informatik.uni-erlangen.de>
-: Fri, 12 May 2017 12:09:45 +0200 (CEST)
-: of82ecuq@cip.cs.fau.de (Johannes Schilling)
-ect: maildir delivery test mail
+X-Original-To: of82ecuq@cip.cs.fau.de
+Delivered-To: of82ecuq@cip.cs.fau.de
+Received: from faui0fl.informatik.uni-erlangen.de (unknown [IPv6:2001:638:a000:4160:131:188:60:117])
+        by faui03.informatik.uni-erlangen.de (Postfix) with ESMTP id 466C1240A3D
+        for <of82ecuq@cip.cs.fau.de>; Fri, 12 May 2017 10:09:45 +0000 (UTC)
+Received: by faui0fl.informatik.uni-erlangen.de (Postfix, from userid 303135)
+        id 389CC10E1A32; Fri, 12 May 2017 12:09:45 +0200 (CEST)
+To: of82ecuq@cip.cs.fau.de
+MIME-Version: 1.0
+Content-Type: text/plain; charset=\"UTF-8\"
+Content-Transfer-Encoding: 8bit
+Message-Id: <20170512100945.389CC10E1A32@faui0fl.informatik.uni-erlangen.de>
+Date: Fri, 12 May 2017 12:09:45 +0200 (CEST)
+From: of82ecuq@cip.cs.fau.de (Johannes Schilling)
+Subject: maildir delivery test mail
 
-y is Boomtime, the 59th day of Discord in the YOLD 3183";
+Today is Boomtime, the 59th day of Discord in the YOLD 3183";
 
 #[test]
 fn check_store_new() {
