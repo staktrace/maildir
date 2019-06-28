@@ -384,18 +384,20 @@ impl Maildir {
     /// Stores the given message data as a new message file in the Maildir `new` folder. Does not
     /// create the neccessary directories, so if in doubt call `create_dirs` before using
     /// `store_new`.
-    pub fn store_new(&self, data: &[u8]) -> std::result::Result<(), MaildirError> {
+    /// Returns the Id of the inserted message on success.
+    pub fn store_new(&self, data: &[u8]) -> std::result::Result<String, MaildirError> {
         self.store(Subfolder::New, data, "")
     }
 
     /// Stores the given message data as a new message file in the Maildir `cur` folder, adding the
     /// given `flags` to it. The possible flags are explained e.g. at
     /// <https://cr.yp.to/proto/maildir.html> or <http://www.courier-mta.org/maildir.html>.
+    /// Returns the Id of the inserted message on success.
     pub fn store_cur_with_flags(
         &self,
         data: &[u8],
         flags: &str,
-    ) -> std::result::Result<(), MaildirError> {
+    ) -> std::result::Result<String, MaildirError> {
         self.store(Subfolder::Cur, data, &format!(":2,{}", flags))
     }
 
@@ -404,7 +406,7 @@ impl Maildir {
         subfolder: Subfolder,
         data: &[u8],
         flags: &str,
-    ) -> std::result::Result<(), MaildirError> {
+    ) -> std::result::Result<String, MaildirError> {
         // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
         // dovecot and courier IMAP use <timestamp>.M<usec>P<pid>.<hostname> for tmp-files and then
         // move to <timestamp>.M<usec>P<pid>V<dev>I<ino>.<hostname>,S=<size_in_bytes> when moving
@@ -449,8 +451,8 @@ impl Maildir {
             Subfolder::New => "new",
             Subfolder::Cur => "cur",
         });
-        newpath.push(format!(
-            "{}.M{}P{}V{}I{}.{},S={}{}",
+        let id = format!(
+            "{}.M{}P{}V{}I{}.{},S={}",
             ts.as_secs(),
             ts.subsec_nanos(),
             pid,
@@ -458,11 +460,11 @@ impl Maildir {
             meta.ino(),
             hostname,
             meta.size(),
-            flags
-        ));
+        );
+        newpath.push(format!("{}{}", id, flags));
         std::fs::rename(tmppath, newpath)?;
 
-        Ok(())
+        Ok(id)
     }
 }
 
