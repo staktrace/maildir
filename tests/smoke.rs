@@ -177,7 +177,7 @@ fn check_store_new() {
 
         assert_eq!(
             msg.unwrap().parsed().unwrap().get_body_raw().unwrap(),
-            "Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_bytes()
+            b"Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_ref()
         );
     });
 }
