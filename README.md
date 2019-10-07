@@ -17,7 +17,7 @@ The Maildir structure then has functions that can be used to access and modify m
 
 Documentation
 ---
-See the rustdoc at [http://staktrace.github.io/maildir/target/doc/maildir/](http://staktrace.github.io/maildir/target/doc/maildir/).
+See the rustdoc at [docs.rs](https://docs.rs/maildir/).
 
 Other notes
 ---
