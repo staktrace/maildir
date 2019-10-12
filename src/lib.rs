@@ -345,12 +345,21 @@ impl Maildir {
     /// `cur` maildir folder. The id passed in should be
     /// obtained from the iterator produced by `list_new`.
     pub fn move_new_to_cur(&self, id: &str) -> std::io::Result<()> {
+        self.move_new_to_cur_with_flags(id, "")
+    }
+
+    /// Moves a message from the `new` maildir folder to the `cur` maildir folder, and sets the
+    /// given flags. The id passed in should be obtained from the iterator produced by `list_new`.
+    ///
+    /// The possible flags are described e.g. at <https://cr.yp.to/proto/maildir.html> or
+    /// <http://www.courier-mta.org/maildir.html>.
+    pub fn move_new_to_cur_with_flags(&self, id: &str, flags: &str) -> std::io::Result<()> {
         let mut src = self.path.clone();
         src.push("new");
         src.push(id);
         let mut dst = self.path.clone();
         dst.push("cur");
-        dst.push(String::from(id) + ":2,");
+        dst.push(String::from(id) + ":2," + flags);
         fs::rename(src, dst)
     }
 
