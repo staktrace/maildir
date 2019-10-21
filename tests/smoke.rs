@@ -106,6 +106,30 @@ fn maildir_find() {
 }
 
 #[test]
+fn check_delete() {
+    with_maildir("maildir1", |maildir| {
+        assert_eq!(
+            maildir
+                .find("1463941010.5f7fa6dd4922c183dc457d033deee9d7")
+                .is_some(),
+            true
+        );
+        assert_eq!(
+            maildir
+                .delete("1463941010.5f7fa6dd4922c183dc457d033deee9d7")
+                .is_ok(),
+            true
+        );
+        assert_eq!(
+            maildir
+                .find("1463941010.5f7fa6dd4922c183dc457d033deee9d7")
+                .is_some(),
+            false
+        );
+    })
+}
+
+#[test]
 fn mark_read() {
     with_maildir("maildir1", |maildir| {
         assert_eq!(
