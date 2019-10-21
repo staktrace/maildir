@@ -378,6 +378,13 @@ impl Maildir {
             .map(|e| e.unwrap())
     }
 
+    pub fn delete(&self, id: &str) -> std::io::Result<()> {
+        match self.find(id) {
+            Some(m) => fs::remove_file(m.path()),
+            None => Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Mail entry not found")),
+        }
+    }
+
     /// Creates all neccessary directories if they don't exist yet. It is the library user's
     /// responsibility to call this before using `store_new`.
     pub fn create_dirs(&self) -> std::io::Result<()> {
