@@ -1,6 +1,6 @@
 [package]
 name = "maildir"
-version = "0.2.0"
+version = "0.3.1"
 authors = ["Kartikaya Gupta <kats@seldon.staktrace.com>"]
 description = "A simple library for maildir manipulation"
 documentation = "https://docs.rs/maildir/"
