@@ -117,6 +117,16 @@ impl MailEntry {
         }
     }
 
+    pub fn date(&mut self) -> Result<i64, MailEntryError> {
+        self.read_data()?;
+        let headers = self.headers()?;
+        let date = headers.get_first_value("Date")?;
+        match date {
+            Some(ts) => dateparse(&ts).map_err(MailEntryError::from),
+            None => Err("No Date header found")?,
+        }
+    }
+
     pub fn flags(&self) -> &str {
         &self.flags
     }
