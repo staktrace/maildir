@@ -391,7 +391,10 @@ impl Maildir {
     pub fn delete(&self, id: &str) -> std::io::Result<()> {
         match self.find(id) {
             Some(m) => fs::remove_file(m.path()),
-            None => Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Mail entry not found")),
+            None => Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Mail entry not found",
+            )),
         }
     }
 
