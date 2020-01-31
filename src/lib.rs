@@ -5,7 +5,6 @@ use std::io::prelude::*;
 use std::ops::Deref;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::thread;
 use std::time;
 
 use mailparse::*;
@@ -451,11 +450,10 @@ impl Maildir {
         // loop when conflicting filenames occur, as described at
         // http://www.courier-mta.org/maildir.html
         // this assumes that pid and hostname don't change.
-        let mut ts;
+        let mut ts = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
         let mut tmppath = self.path.clone();
         tmppath.push("tmp");
         loop {
-            ts = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
             tmppath.push(format!(
                 "{}.M{}P{}.{}",
                 ts.as_secs(),
@@ -467,7 +465,7 @@ impl Maildir {
                 break;
             }
             tmppath.pop();
-            thread::sleep(time::Duration::from_millis(10));
+            ts += time::Duration::from_millis(10);
         }
 
         let mut file = std::fs::File::create(tmppath.to_owned())?;
