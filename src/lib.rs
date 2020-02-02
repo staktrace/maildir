@@ -246,7 +246,6 @@ impl Iterator for MailEntries {
 pub enum MaildirError {
     Io(std::io::Error),
     Utf8(std::str::Utf8Error),
-    Nix(nix::Error),
     Time(std::time::SystemTimeError),
 }
 
@@ -257,7 +256,6 @@ impl fmt::Display for MaildirError {
         match *self {
             Io(ref e) => write!(f, "IO Error: {}", e),
             Utf8(ref e) => write!(f, "UTF8 Encoding Error: {}", e),
-            Nix(ref e) => write!(f, "nix library Error: {}", e),
             Time(ref e) => write!(f, "Time Error: {}", e),
         }
     }
@@ -270,7 +268,6 @@ impl error::Error for MaildirError {
         match *self {
             Io(ref e) => e.description(),
             Utf8(ref e) => e.description(),
-            Nix(ref e) => e.description(),
             Time(ref e) => e.description(),
         }
     }
@@ -281,7 +278,6 @@ impl error::Error for MaildirError {
         match *self {
             Io(ref e) => Some(e),
             Utf8(ref e) => Some(e),
-            Nix(ref e) => Some(e),
             Time(ref e) => Some(e),
         }
     }
@@ -295,11 +291,6 @@ impl From<std::io::Error> for MaildirError {
 impl From<std::str::Utf8Error> for MaildirError {
     fn from(e: std::str::Utf8Error) -> MaildirError {
         MaildirError::Utf8(e)
-    }
-}
-impl From<nix::Error> for MaildirError {
-    fn from(e: nix::Error) -> MaildirError {
-        MaildirError::Nix(e)
     }
 }
 impl From<std::time::SystemTimeError> for MaildirError {
@@ -438,14 +429,9 @@ impl Maildir {
         // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
         // dovecot and courier IMAP use <timestamp>.M<usec>P<pid>.<hostname> for tmp-files and then
         // move to <timestamp>.M<usec>P<pid>V<dev>I<ino>.<hostname>,S=<size_in_bytes> when moving
-        // to new dir. see for example http://www.courier-mta.org/maildir.html
-        let pid = nix::unistd::getpid();
-
-        // note: gethostname(2) says that 64 bytes is the de-facto limit on linux, SUSv2 says limit
-        // is 255.
-        let mut hostname_buf = [0u8; 255];
-        let hostname_cstr = nix::unistd::gethostname(&mut hostname_buf)?;
-        let hostname = hostname_cstr.to_str()?;
+        // to new dir. see for example http://www.courier-mta.org/maildir.html.
+        let pid = std::process::id();
+        let hostname = gethostname::gethostname();
 
         // loop when conflicting filenames occur, as described at
         // http://www.courier-mta.org/maildir.html
@@ -459,7 +445,7 @@ impl Maildir {
                 ts.as_secs(),
                 ts.subsec_nanos(),
                 pid,
-                hostname
+                hostname.to_string_lossy()
             ));
             if !tmppath.exists() {
                 break;
@@ -485,7 +471,7 @@ impl Maildir {
             pid,
             meta.dev(),
             meta.ino(),
-            hostname,
+            hostname.to_string_lossy(),
             meta.size(),
         );
         newpath.push(format!("{}{}", id, flags));
