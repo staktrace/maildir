@@ -223,3 +223,22 @@ fn check_store_cur() {
         assert_eq!(first.flags(), testflags);
     });
 }
+
+#[test]
+fn check_flag_fiddling() {
+    with_maildir_empty("maildir2", |maildir| {
+        maildir.create_dirs().unwrap();
+        let id = maildir
+            .store_cur_with_flags(TEST_MAIL_BODY, "SR")
+            .unwrap();
+
+        assert_eq!(maildir.count_cur(), 1);
+        assert_eq!(maildir.find(&id).unwrap().flags(), "RS");
+        maildir.remove_flags(&id, "FS").unwrap();
+        assert_eq!(maildir.find(&id).unwrap().flags(), "R");
+        maildir.add_flags(&id, "RF").unwrap();
+        assert_eq!(maildir.find(&id).unwrap().flags(), "FR");
+        maildir.set_flags(&id, "SF").unwrap();
+        assert_eq!(maildir.find(&id).unwrap().flags(), "FS");
+    });
+}

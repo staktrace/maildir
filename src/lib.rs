@@ -359,7 +359,7 @@ impl Maildir {
         src.push(id);
         let mut dst = self.path.clone();
         dst.push("cur");
-        dst.push(String::from(id) + ":2," + flags);
+        dst.push(String::from(id) + ":2," + &Self::normalize_flags(flags));
         fs::rename(src, dst)
     }
 
@@ -378,6 +378,75 @@ impl Maildir {
             .map(|e| e.unwrap())
     }
 
+    fn normalize_flags(flags: &str) -> String {
+        let mut flag_chars = flags.chars().collect::<Vec<char>>();
+        flag_chars.sort();
+        flag_chars.dedup();
+        flag_chars.into_iter().collect()
+    }
+
+    fn update_flags<F>(&self, id: &str, flag_op: F) -> std::io::Result<()>
+        where F: Fn(&str) -> String
+    {
+        let filter = |entry: &std::io::Result<MailEntry>| match *entry {
+            Err(_) => false,
+            Ok(ref e) => e.id() == id,
+        };
+
+        match self.list_cur().find(&filter).map(|e| e.unwrap()) {
+            Some(m) => {
+                let src = m.path();
+                let mut dst = m.path().clone();
+                dst.pop();
+                dst.push(String::from(m.id()) + ":2," + &flag_op(m.flags()));
+                fs::rename(src, dst)
+            }
+            None => Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Mail entry not found",
+            )),
+        }
+    }
+
+    /// Updates the flags for the message with the given id in the
+    /// maildir. This only searches the `cur` folder, because that's
+    /// the folder where messages have flags. Returns an error if the
+    /// message was not found. All existing flags are overwritten with
+    /// the new flags provided.
+    pub fn set_flags(&self, id: &str, flags: &str) -> std::io::Result<()> {
+        self.update_flags(id, |_old_flags| Self::normalize_flags(flags))
+    }
+
+    /// Adds the given flags to the message with the given id in the maildir.
+    /// This only searches the `cur` folder, because that's the folder where
+    /// messages have flags. Returns an error if the message was not found.
+    /// Flags are deduplicated, so setting a already-set flag has no effect.
+    pub fn add_flags(&self, id: &str, flags: &str) -> std::io::Result<()> {
+        let flag_merge = |old_flags: &str| {
+            let merged = String::from(old_flags) + flags;
+            Self::normalize_flags(&merged)
+        };
+        self.update_flags(id, &flag_merge)
+    }
+
+    /// Removes the given flags to the message with the given id in the maildir.
+    /// This only searches the `cur` folder, because that's the folder where
+    /// messages have flags. Returns an error if the message was not found.
+    /// If the message doesn't have the flag(s) to be removed, those flags are
+    /// ignored.
+    pub fn remove_flags(&self, id: &str, flags: &str) -> std::io::Result<()> {
+        let flag_strip = |old_flags: &str| {
+            old_flags.chars()
+                .filter(|c| !flags.contains(*c))
+                .collect()
+        };
+        self.update_flags(id, &flag_strip)
+    }
+
+    /// Deletes the message with the given id in the maildir.
+    /// This searches both the `new` and the `cur` folders,
+    /// and deletes the file from the filesystem. Returns an
+    /// error if no message was found with the given id.
     pub fn delete(&self, id: &str) -> std::io::Result<()> {
         match self.find(id) {
             Some(m) => fs::remove_file(m.path()),
@@ -417,14 +486,14 @@ impl Maildir {
         data: &[u8],
         flags: &str,
     ) -> std::result::Result<String, MaildirError> {
-        self.store(Subfolder::Cur, data, &format!(":2,{}", flags))
+        self.store(Subfolder::Cur, data, &format!(":2,{}", Self::normalize_flags(flags)))
     }
 
     fn store(
         &self,
         subfolder: Subfolder,
         data: &[u8],
-        flags: &str,
+        info: &str,
     ) -> std::result::Result<String, MaildirError> {
         // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
         // dovecot and courier IMAP use <timestamp>.M<usec>P<pid>.<hostname> for tmp-files and then
@@ -474,7 +543,7 @@ impl Maildir {
             hostname.to_string_lossy(),
             meta.size(),
         );
-        newpath.push(format!("{}{}", id, flags));
+        newpath.push(format!("{}{}", id, info));
         std::fs::rename(tmppath, newpath)?;
 
         Ok(id)
