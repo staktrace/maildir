@@ -15,9 +15,6 @@ matrix:
       script:
         - cargo fmt -v -- --check
 
-notifications:
-  email: false
-
 stages:
   - test
   - lint
