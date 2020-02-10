@@ -386,7 +386,8 @@ impl Maildir {
     }
 
     fn update_flags<F>(&self, id: &str, flag_op: F) -> std::io::Result<()>
-        where F: Fn(&str) -> String
+    where
+        F: Fn(&str) -> String,
     {
         let filter = |entry: &std::io::Result<MailEntry>| match *entry {
             Err(_) => false,
@@ -435,11 +436,8 @@ impl Maildir {
     /// If the message doesn't have the flag(s) to be removed, those flags are
     /// ignored.
     pub fn remove_flags(&self, id: &str, flags: &str) -> std::io::Result<()> {
-        let flag_strip = |old_flags: &str| {
-            old_flags.chars()
-                .filter(|c| !flags.contains(*c))
-                .collect()
-        };
+        let flag_strip =
+            |old_flags: &str| old_flags.chars().filter(|c| !flags.contains(*c)).collect();
         self.update_flags(id, &flag_strip)
     }
 
@@ -486,7 +484,11 @@ impl Maildir {
         data: &[u8],
         flags: &str,
     ) -> std::result::Result<String, MaildirError> {
-        self.store(Subfolder::Cur, data, &format!(":2,{}", Self::normalize_flags(flags)))
+        self.store(
+            Subfolder::Cur,
+            data,
+            &format!(":2,{}", Self::normalize_flags(flags)),
+        )
     }
 
     fn store(

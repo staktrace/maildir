@@ -228,9 +228,7 @@ fn check_store_cur() {
 fn check_flag_fiddling() {
     with_maildir_empty("maildir2", |maildir| {
         maildir.create_dirs().unwrap();
-        let id = maildir
-            .store_cur_with_flags(TEST_MAIL_BODY, "SR")
-            .unwrap();
+        let id = maildir.store_cur_with_flags(TEST_MAIL_BODY, "SR").unwrap();
 
         assert_eq!(maildir.count_cur(), 1);
         assert_eq!(maildir.find(&id).unwrap().flags(), "RS");
