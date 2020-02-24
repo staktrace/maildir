@@ -104,14 +104,13 @@ impl MailEntry {
     pub fn received(&mut self) -> Result<i64, MailEntryError> {
         self.read_data()?;
         let headers = self.headers()?;
-        let received = headers.get_first_value("Received")?;
+        let received = headers.get_first_value("Received");
         match received {
             Some(v) => v
                 .rsplit(';')
                 .nth(0)
-                .ok_or_else(|| "Unable to split Received header")
-                .and_then(|ts| dateparse(ts))
-                .map_err(MailEntryError::from),
+                .ok_or_else(|| MailEntryError::DateError("Unable to split Received header"))
+                .and_then(|ts| dateparse(ts).map_err(MailEntryError::from)),
             None => Err("No Received header found")?,
         }
     }
@@ -119,7 +118,7 @@ impl MailEntry {
     pub fn date(&mut self) -> Result<i64, MailEntryError> {
         self.read_data()?;
         let headers = self.headers()?;
-        let date = headers.get_first_value("Date")?;
+        let date = headers.get_first_value("Date");
         match date {
             Some(ts) => dateparse(&ts).map_err(MailEntryError::from),
             None => Err("No Date header found")?,

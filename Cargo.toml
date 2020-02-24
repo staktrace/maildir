@@ -17,7 +17,7 @@ travis-ci = { repository = "staktrace/maildir" }
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-mailparse = "0.11"
+mailparse = "0.12"
 gethostname = "0.2.1"
 
 [dev-dependencies]

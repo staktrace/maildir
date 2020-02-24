@@ -62,7 +62,7 @@ fn maildir_list() {
         let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463941010.5f7fa6dd4922c183dc457d033deee9d7");
         assert_eq!(
-            first.headers().unwrap().get_first_value("Subject").unwrap(),
+            first.headers().unwrap().get_first_value("Subject"),
             Some(String::from("test"))
         );
         assert_eq!(first.is_seen(), false);
@@ -73,12 +73,7 @@ fn maildir_list() {
         let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463868505.38518452d49213cb409aa1db32f53184");
         assert_eq!(
-            first
-                .parsed()
-                .unwrap()
-                .headers
-                .get_first_value("Subject")
-                .unwrap(),
+            first.parsed().unwrap().headers.get_first_value("Subject"),
             Some(String::from("test"))
         );
         assert_eq!(first.is_seen(), true);
