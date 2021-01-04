@@ -30,14 +30,6 @@ impl fmt::Display for MailEntryError {
 }
 
 impl error::Error for MailEntryError {
-    fn description(&self) -> &str {
-        match *self {
-            MailEntryError::IOError(ref err) => err.description(),
-            MailEntryError::ParseError(ref err) => err.description(),
-            MailEntryError::DateError(ref msg) => msg,
-        }
-    }
-
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             MailEntryError::IOError(ref err) => Some(err),
@@ -302,16 +294,6 @@ impl fmt::Display for MaildirError {
 }
 
 impl error::Error for MaildirError {
-    fn description(&self) -> &str {
-        use MaildirError::*;
-
-        match *self {
-            Io(ref e) => e.description(),
-            Utf8(ref e) => e.description(),
-            Time(ref e) => e.description(),
-        }
-    }
-
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         use MaildirError::*;
 
