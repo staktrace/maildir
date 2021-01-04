@@ -1,3 +1,6 @@
+#[cfg(feature = "mmap")]
+extern crate memmap;
+
 use std::error;
 use std::fmt;
 use std::fs;
@@ -62,6 +65,23 @@ impl From<&'static str> for MailEntryError {
     }
 }
 
+enum MailData {
+    None,
+    #[cfg(not(feature = "mmap"))]
+    Bytes(Vec<u8>),
+    #[cfg(feature = "mmap")]
+    File(memmap::Mmap),
+}
+
+impl MailData {
+    fn is_none(&self) -> bool {
+        match self {
+            MailData::None => true,
+            _ => false,
+        }
+    }
+}
+
 /// This struct represents a single email message inside
 /// the maildir. Creation of the struct does not automatically
 /// load the content of the email file into memory - however,
@@ -71,7 +91,7 @@ pub struct MailEntry {
     id: String,
     flags: String,
     path: PathBuf,
-    data: Option<Vec<u8>>,
+    data: MailData,
 }
 
 impl MailEntry {
@@ -81,24 +101,45 @@ impl MailEntry {
 
     fn read_data(&mut self) -> std::io::Result<()> {
         if self.data.is_none() {
-            let mut f = fs::File::open(self.path.clone())?;
-            let mut d = Vec::<u8>::new();
-            f.read_to_end(&mut d)?;
-            self.data = Some(d);
+            #[cfg(feature = "mmap")]
+            {
+                let f = fs::File::open(&self.path)?;
+                let mmap = unsafe { memmap::MmapOptions::new().map(&f)? };
+                self.data = MailData::File(mmap);
+            }
+
+            #[cfg(not(feature = "mmap"))]
+            {
+                let mut f = fs::File::open(&self.path)?;
+                let mut d = Vec::<u8>::new();
+                f.read_to_end(&mut d)?;
+                self.data = MailData::Bytes(d);
+            }
         }
         Ok(())
     }
 
     pub fn parsed(&mut self) -> Result<ParsedMail, MailEntryError> {
         self.read_data()?;
-        parse_mail(self.data.as_ref().unwrap()).map_err(MailEntryError::ParseError)
+        match self.data {
+            MailData::None => panic!("read_data should have returned an Err!"),
+            #[cfg(not(feature = "mmap"))]
+            MailData::Bytes(ref b) => parse_mail(b).map_err(MailEntryError::ParseError),
+            #[cfg(feature = "mmap")]
+            MailData::File(ref m) => parse_mail(m).map_err(MailEntryError::ParseError),
+        }
     }
 
     pub fn headers(&mut self) -> Result<Vec<MailHeader>, MailEntryError> {
         self.read_data()?;
-        parse_headers(self.data.as_ref().unwrap())
-            .map(|(v, _)| v)
-            .map_err(MailEntryError::ParseError)
+        let headers = match self.data {
+            MailData::None => panic!("read_data should have returned an Err!"),
+            #[cfg(not(feature = "mmap"))]
+            MailData::Bytes(ref b) => parse_headers(b),
+            #[cfg(feature = "mmap")]
+            MailData::File(ref m) => parse_headers(m),
+        };
+        headers.map(|(v, _)| v).map_err(MailEntryError::ParseError)
     }
 
     pub fn received(&mut self) -> Result<i64, MailEntryError> {
@@ -228,7 +269,7 @@ impl Iterator for MailEntries {
                     id: String::from(id.unwrap()),
                     flags: String::from(flags.unwrap()),
                     path: entry.path(),
-                    data: None,
+                    data: MailData::None,
                 }))
             });
             return match result {
