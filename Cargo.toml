@@ -13,7 +13,6 @@ keywords = ["maildir", "email", "rfc822", "mime"]
 categories = ["email", "filesystem"]
 
 [badges]
-travis-ci = { repository = "staktrace/maildir" }
 maintenance = { status = "passively-maintained" }
 
 [dependencies]

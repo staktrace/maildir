@@ -1,6 +1,6 @@
 maildir
 ===
-[![Build Status](https://travis-ci.org/staktrace/maildir.svg?branch=master)](https://travis-ci.org/staktrace/maildir)
+![Build Status](https://github.com/staktrace/maildir/actions/workflows/test.yml/badge.svg)
 [![Crate](https://img.shields.io/crates/v/maildir.svg)](https://crates.io/crates/maildir)
 
 A simple library to deal with maildir folders
