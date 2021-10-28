@@ -11,6 +11,7 @@ repository = "https://github.com/staktrace/maildir"
 readme = "README.md"
 keywords = ["maildir", "email", "rfc822", "mime"]
 categories = ["email", "filesystem"]
+exclude = [".gitignore", ".github/**"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
