@@ -321,6 +321,68 @@ impl From<std::time::SystemTimeError> for MaildirError {
     }
 }
 
+/// An iterator over the maildir subdirectories. This iterator
+/// produces a `std::io::Result<Maildir>`, which can be an
+/// `Err` if an error was encountered while trying to read
+/// file system properties on a particular entry. Only
+/// subdirectories starting with a single period are included.
+pub struct MaildirEntries {
+    path: PathBuf,
+    readdir: Option<fs::ReadDir>,
+}
+
+impl MaildirEntries {
+    fn new(path: PathBuf) -> MaildirEntries {
+        MaildirEntries {
+            path,
+            readdir: None,
+        }
+    }
+}
+
+impl Iterator for MaildirEntries {
+    type Item = std::io::Result<Maildir>;
+
+    fn next(&mut self) -> Option<std::io::Result<Maildir>> {
+        if self.readdir.is_none() {
+            self.readdir = match fs::read_dir(&self.path) {
+                Err(_) => return None,
+                Ok(v) => Some(v),
+            };
+        }
+
+        loop {
+            let dir_entry = self.readdir.iter_mut().next().unwrap().next();
+            let result = dir_entry.map(|e| {
+                let entry = e?;
+
+                // a dir name should start by one single period
+                let filename = String::from(entry.file_name().to_string_lossy().deref());
+                if !filename.starts_with('.') || filename.starts_with("..") {
+                    return Ok(None);
+                }
+
+                // the entry should be a directory
+                let is_dir = entry.metadata().map(|m| m.is_dir()).unwrap_or_default();
+                if !is_dir {
+                    return Ok(None);
+                }
+
+                Ok(Some(Maildir {
+                    path: self.path.join(filename),
+                }))
+            });
+
+            return match result {
+                None => None,
+                Some(Err(e)) => Some(Err(e)),
+                Some(Ok(None)) => continue,
+                Some(Ok(Some(v))) => Some(Ok(v)),
+            };
+        }
+    }
+}
+
 /// The main entry point for this library. This struct can be
 /// instantiated from a path using the `from` implementations.
 /// The path passed in to the `from` should be the root of the
@@ -361,6 +423,14 @@ impl Maildir {
     /// over multiple invocations of this method.
     pub fn list_cur(&self) -> MailEntries {
         MailEntries::new(self.path.clone(), Subfolder::Cur)
+    }
+
+    /// Returns an iterator over the maildir subdirectories.
+    /// The order of subdirectories in the iterator
+    /// is not specified, and is not guaranteed to be stable
+    /// over multiple invocations of this method.
+    pub fn list_subdirs(&self) -> MaildirEntries {
+        MaildirEntries::new(self.path.clone())
     }
 
     /// Moves a message from the `new` maildir folder to the
