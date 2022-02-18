@@ -83,6 +83,28 @@ fn maildir_list() {
 }
 
 #[test]
+fn maildir_list_subdirs() {
+    with_maildir("maildir2", |maildir| {
+        let subdirs: Vec<_> = maildir
+            .list_subdirs()
+            .map(|dir| {
+                dir.unwrap()
+                    .path()
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect();
+
+        assert_eq!(2, subdirs.len());
+        assert!(subdirs.contains(&".Subdir1".into()));
+        assert!(subdirs.contains(&".Subdir2".into()));
+        assert!(!subdirs.contains(&"..Subdir3".into()));
+    });
+}
+
+#[test]
 fn maildir_find() {
     with_maildir("maildir1", |maildir| {
         assert_eq!(
@@ -121,6 +143,39 @@ fn check_delete() {
                 .is_some(),
             false
         );
+    })
+}
+
+#[test]
+fn check_copy_and_move() {
+    with_maildir("maildir1", |maildir1| {
+        with_maildir("maildir2", |maildir2| {
+            let id = "1463868505.38518452d49213cb409aa1db32f53184";
+
+            // check that we cannot copy a message from and to the same maildir
+            assert_eq!(
+                maildir1.copy_to(id, &maildir1).unwrap_err().kind(),
+                std::io::ErrorKind::InvalidInput,
+            );
+
+            // check that the message is present in maildir1 but not in maildir2
+            assert!(maildir1.find(id).is_some());
+            assert!(maildir2.find(id).is_none());
+
+            // copy the message from maildir1 to maildir2
+            maildir1.copy_to(id, &maildir2).unwrap();
+
+            // check that the message is now present in both
+            assert!(maildir1.find(id).is_some());
+            assert!(maildir2.find(id).is_some());
+
+            // move the message from maildir2 to maildir1
+            maildir2.move_to(id, &maildir1).unwrap();
+
+            // check that the message is now only present in maildir1
+            assert!(maildir1.find(id).is_some());
+            assert!(maildir2.find(id).is_none());
+        })
     })
 }
 
