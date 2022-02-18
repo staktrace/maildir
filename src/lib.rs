@@ -455,6 +455,46 @@ impl Maildir {
         fs::rename(src, dst)
     }
 
+    /// Copies a message from the current maildir to the targetted maildir.
+    pub fn copy_to(&self, id: &str, target: &Maildir) -> std::io::Result<()> {
+        let entry = self.find(id).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "Mail entry not found")
+        })?;
+        let filename = entry.path().file_name().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid mail entry file name",
+            )
+        })?;
+
+        let src_path = entry.path();
+        let dst_path = target.path().join("cur").join(filename);
+        if src_path == &dst_path {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Target maildir needs to be different from the source",
+            ));
+        }
+
+        fs::copy(src_path, dst_path)?;
+        Ok(())
+    }
+
+    /// Moves a message from the current maildir to the targetted maildir.
+    pub fn move_to(&self, id: &str, target: &Maildir) -> std::io::Result<()> {
+        let entry = self.find(id).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "Mail entry not found")
+        })?;
+        let filename = entry.path().file_name().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid mail entry file name",
+            )
+        })?;
+        fs::rename(entry.path(), target.path().join("cur").join(filename))?;
+        Ok(())
+    }
+
     /// Tries to find the message with the given id in the
     /// maildir. This searches both the `new` and the `cur`
     /// folders.
