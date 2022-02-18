@@ -161,6 +161,9 @@ fn check_copy_and_move() {
             // check that the message is present in maildir1 but not in maildir2
             assert!(maildir1.find(id).is_some());
             assert!(maildir2.find(id).is_none());
+            // also check that the failed self-copy a few lines up didn't corrupt the
+            // message file.
+            assert!(maildir1.find(id).unwrap().date().is_ok());
 
             // copy the message from maildir1 to maildir2
             maildir1.copy_to(id, &maildir2).unwrap();
