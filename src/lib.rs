@@ -6,11 +6,19 @@ use std::fmt;
 use std::fs;
 use std::io::prelude::*;
 use std::ops::Deref;
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::time;
 
 use mailparse::*;
+
+#[cfg(unix)]
+const INFORMATIONAL_SUFFIX_SEPARATOR: &str = ":";
+#[cfg(windows)]
+const INFORMATIONAL_SUFFIX_SEPARATOR: &str = ";";
 
 #[derive(Debug)]
 pub enum MailEntryError {
@@ -247,7 +255,8 @@ impl Iterator for MailEntries {
                 let (id, flags) = match self.subfolder {
                     Subfolder::New => (Some(filename.as_str()), Some("")),
                     Subfolder::Cur => {
-                        let mut iter = filename.split(":2,");
+                        let delim = format!("{}2,", INFORMATIONAL_SUFFIX_SEPARATOR);
+                        let mut iter = filename.split(&delim);
                         (iter.next(), iter.next())
                     }
                 };
@@ -446,12 +455,13 @@ impl Maildir {
     /// The possible flags are described e.g. at <https://cr.yp.to/proto/maildir.html> or
     /// <http://www.courier-mta.org/maildir.html>.
     pub fn move_new_to_cur_with_flags(&self, id: &str, flags: &str) -> std::io::Result<()> {
-        let mut src = self.path.clone();
-        src.push("new");
-        src.push(id);
-        let mut dst = self.path.clone();
-        dst.push("cur");
-        dst.push(String::from(id) + ":2," + &Self::normalize_flags(flags));
+        let src = self.path.join("new").join(id);
+        let dst = self.path.join("cur").join(format!(
+            "{}{}2,{}",
+            id,
+            INFORMATIONAL_SUFFIX_SEPARATOR,
+            Self::normalize_flags(flags)
+        ));
         fs::rename(src, dst)
     }
 
@@ -531,7 +541,12 @@ impl Maildir {
                 let src = m.path();
                 let mut dst = m.path().clone();
                 dst.pop();
-                dst.push(String::from(m.id()) + ":2," + &flag_op(m.flags()));
+                dst.push(format!(
+                    "{}{}2,{}",
+                    m.id(),
+                    INFORMATIONAL_SUFFIX_SEPARATOR,
+                    flag_op(m.flags())
+                ));
                 fs::rename(src, dst)
             }
             None => Err(std::io::Error::new(
@@ -619,7 +634,11 @@ impl Maildir {
         self.store(
             Subfolder::Cur,
             data,
-            &format!(":2,{}", Self::normalize_flags(flags)),
+            &format!(
+                "{}2,{}",
+                INFORMATIONAL_SUFFIX_SEPARATOR,
+                Self::normalize_flags(flags)
+            ),
         )
     }
 
@@ -667,15 +686,31 @@ impl Maildir {
             Subfolder::New => "new",
             Subfolder::Cur => "cur",
         });
+
+        #[cfg(unix)]
+        let dev = meta.dev();
+        #[cfg(windows)]
+        let dev: u64 = 0;
+
+        #[cfg(unix)]
+        let ino = meta.ino();
+        #[cfg(windows)]
+        let ino: u64 = 0;
+
+        #[cfg(unix)]
+        let size = meta.size();
+        #[cfg(windows)]
+        let size = meta.file_size();
+
         let id = format!(
             "{}.M{}P{}V{}I{}.{},S={}",
             ts.as_secs(),
             ts.subsec_nanos(),
             pid,
-            meta.dev(),
-            meta.ino(),
+            dev,
+            ino,
             hostname.to_string_lossy(),
-            meta.size(),
+            size,
         );
         newpath.push(format!("{}{}", id, info));
         std::fs::rename(tmppath, newpath)?;
