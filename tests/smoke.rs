@@ -1,9 +1,16 @@
 use maildir::*;
 
+#[cfg(unix)]
 use std::borrow::Cow;
+#[cfg(unix)]
 use std::ffi::OsStr;
+#[cfg(windows)]
+use std::ffi::OsString;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
+#[cfg(windows)]
+use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
 use mailparse::MailHeaderMap;
 use percent_encoding::percent_decode;
@@ -17,6 +24,11 @@ static SUBMAILDIRS_NAME: &str = "submaildirs";
 // `cargo package` doesn't package files with certain characters, such as
 // colons, in the name, so we percent-decode the file names when copying the
 // data for the tests.
+// This code can likely be improved (for correctness, particularly on Windows)
+// but there's no good docs on what `cargo package` does percent-encoding for,
+// and how it deals with multibyte characters in filenames. In practice this
+// code works fine for this crate, because we have a restricted set of ASCII
+// characters in the filenames.
 fn with_maildir<F>(name: &str, func: F)
 where
     F: FnOnce(Maildir),
@@ -29,10 +41,27 @@ where
         if relative.parent().is_none() {
             continue;
         }
+
+        #[cfg(unix)]
         let decoded_bytes: Cow<[u8]> = percent_decode(relative.as_os_str().as_bytes()).into();
+        #[cfg(unix)]
         let decoded = OsStr::from_bytes(&decoded_bytes);
+
+        #[cfg(windows)]
+        let decoded_bytes = relative
+            .as_os_str()
+            .encode_wide()
+            .map(|b| b as u8)
+            .collect::<Vec<_>>();
+        #[cfg(windows)]
+        let decoded_bytes = percent_decode(decoded_bytes.as_slice())
+            .map(|b| (if b == b':' { b';' } else { b }) as u16)
+            .collect::<Vec<_>>();
+        #[cfg(windows)]
+        let decoded = OsString::from_wide(decoded_bytes.as_slice());
+
         if entry.path().is_dir() {
-            fs::create_dir(tmp_path.join(decoded)).expect("could not create directory");
+            fs::create_dir(tmp_path.join(&decoded)).expect("could not create directory");
         } else {
             fs::copy(entry.path(), tmp_path.join(decoded)).expect("could not copy test data");
         }
