@@ -1,6 +1,8 @@
 use maildir::*;
 
+use std::borrow::Cow;
 use std::fs;
+use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 
 use mailparse::MailHeaderMap;
@@ -25,13 +27,12 @@ where
         if relative.parent().is_none() {
             continue;
         }
-        let decoded = percent_decode(relative.as_os_str().as_bytes())
-            .decode_utf8()
-            .unwrap();
+        let decoded_bytes: Cow<[u8]> = percent_decode(relative.as_os_str().as_bytes()).into();
+        let decoded = OsStr::from_bytes(&decoded_bytes);
         if entry.path().is_dir() {
-            fs::create_dir(tmp_path.join(decoded.as_ref())).expect("could not create directory");
+            fs::create_dir(tmp_path.join(decoded)).expect("could not create directory");
         } else {
-            fs::copy(entry.path(), tmp_path.join(decoded.as_ref()))
+            fs::copy(entry.path(), tmp_path.join(decoded))
                 .expect("could not copy test data");
         }
     }
