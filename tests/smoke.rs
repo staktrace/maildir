@@ -1,8 +1,8 @@
 use maildir::*;
 
 use std::borrow::Cow;
-use std::fs;
 use std::ffi::OsStr;
+use std::fs;
 use std::os::unix::ffi::OsStrExt;
 
 use mailparse::MailHeaderMap;
@@ -32,8 +32,7 @@ where
         if entry.path().is_dir() {
             fs::create_dir(tmp_path.join(decoded)).expect("could not create directory");
         } else {
-            fs::copy(entry.path(), tmp_path.join(decoded))
-                .expect("could not copy test data");
+            fs::copy(entry.path(), tmp_path.join(decoded)).expect("could not copy test data");
         }
     }
     func(Maildir::from(tmp_path.join(name)));
