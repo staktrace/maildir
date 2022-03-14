@@ -11,6 +11,8 @@ use tempfile::tempdir;
 use walkdir::WalkDir;
 
 static TESTDATA_DIR: &str = "testdata";
+static MAILDIR_NAME: &str = "maildir";
+static SUBMAILDIRS_NAME: &str = "submaildirs";
 
 // `cargo package` doesn't package files with certain characters, such as
 // colons, in the name, so we percent-decode the file names when copying the
@@ -49,7 +51,7 @@ where
 
 #[test]
 fn maildir_count() {
-    with_maildir("maildir1", |maildir| {
+    with_maildir(MAILDIR_NAME, |maildir| {
         assert_eq!(maildir.count_cur(), 1);
         assert_eq!(maildir.count_new(), 1);
     });
@@ -57,7 +59,7 @@ fn maildir_count() {
 
 #[test]
 fn maildir_list() {
-    with_maildir("maildir1", |maildir| {
+    with_maildir(MAILDIR_NAME, |maildir| {
         let mut iter = maildir.list_new();
         let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.id(), "1463941010.5f7fa6dd4922c183dc457d033deee9d7");
@@ -84,7 +86,7 @@ fn maildir_list() {
 
 #[test]
 fn maildir_list_subdirs() {
-    with_maildir("maildir2", |maildir| {
+    with_maildir(SUBMAILDIRS_NAME, |maildir| {
         let subdirs: Vec<_> = maildir
             .list_subdirs()
             .map(|dir| {
@@ -106,7 +108,7 @@ fn maildir_list_subdirs() {
 
 #[test]
 fn maildir_find() {
-    with_maildir("maildir1", |maildir| {
+    with_maildir(MAILDIR_NAME, |maildir| {
         assert_eq!(
             maildir
                 .find("1463941010.5f7fa6dd4922c183dc457d033deee9d7")
@@ -124,7 +126,7 @@ fn maildir_find() {
 
 #[test]
 fn check_delete() {
-    with_maildir("maildir1", |maildir| {
+    with_maildir(MAILDIR_NAME, |maildir| {
         assert_eq!(
             maildir
                 .find("1463941010.5f7fa6dd4922c183dc457d033deee9d7")
@@ -148,43 +150,43 @@ fn check_delete() {
 
 #[test]
 fn check_copy_and_move() {
-    with_maildir("maildir1", |maildir1| {
-        with_maildir("maildir2", |maildir2| {
+    with_maildir(MAILDIR_NAME, |maildir| {
+        with_maildir(SUBMAILDIRS_NAME, |submaildir| {
             let id = "1463868505.38518452d49213cb409aa1db32f53184";
 
             // check that we cannot copy a message from and to the same maildir
             assert_eq!(
-                maildir1.copy_to(id, &maildir1).unwrap_err().kind(),
+                maildir.copy_to(id, &maildir).unwrap_err().kind(),
                 std::io::ErrorKind::InvalidInput,
             );
 
-            // check that the message is present in maildir1 but not in maildir2
-            assert!(maildir1.find(id).is_some());
-            assert!(maildir2.find(id).is_none());
+            // check that the message is present in "maildir" but not in "submaildir"
+            assert!(maildir.find(id).is_some());
+            assert!(submaildir.find(id).is_none());
             // also check that the failed self-copy a few lines up didn't corrupt the
             // message file.
-            assert!(maildir1.find(id).unwrap().date().is_ok());
+            assert!(maildir.find(id).unwrap().date().is_ok());
 
-            // copy the message from maildir1 to maildir2
-            maildir1.copy_to(id, &maildir2).unwrap();
+            // copy the message from "maildir" to "submaildir"
+            maildir.copy_to(id, &submaildir).unwrap();
 
             // check that the message is now present in both
-            assert!(maildir1.find(id).is_some());
-            assert!(maildir2.find(id).is_some());
+            assert!(maildir.find(id).is_some());
+            assert!(submaildir.find(id).is_some());
 
-            // move the message from maildir2 to maildir1
-            maildir2.move_to(id, &maildir1).unwrap();
+            // move the message from "submaildir" to "maildir"
+            submaildir.move_to(id, &maildir).unwrap();
 
-            // check that the message is now only present in maildir1
-            assert!(maildir1.find(id).is_some());
-            assert!(maildir2.find(id).is_none());
+            // check that the message is now only present in "maildir"
+            assert!(maildir.find(id).is_some());
+            assert!(submaildir.find(id).is_none());
         })
     })
 }
 
 #[test]
 fn mark_read() {
-    with_maildir("maildir1", |maildir| {
+    with_maildir(MAILDIR_NAME, |maildir| {
         assert_eq!(
             maildir
                 .move_new_to_cur("1463941010.5f7fa6dd4922c183dc457d033deee9d7")
@@ -196,7 +198,7 @@ fn mark_read() {
 
 #[test]
 fn check_received() {
-    with_maildir("maildir1", |maildir| {
+    with_maildir(MAILDIR_NAME, |maildir| {
         let mut iter = maildir.list_cur();
         let mut first = iter.next().unwrap().unwrap();
         assert_eq!(first.received().unwrap(), 1_463_868_507);
