@@ -1,5 +1,5 @@
 #[cfg(feature = "mmap")]
-extern crate memmap;
+extern crate memmap2;
 
 use std::error;
 use std::fmt;
@@ -70,7 +70,7 @@ enum MailData {
     #[cfg(not(feature = "mmap"))]
     Bytes(Vec<u8>),
     #[cfg(feature = "mmap")]
-    File(memmap::Mmap),
+    File(memmap2::Mmap),
 }
 
 impl MailData {
@@ -104,7 +104,7 @@ impl MailEntry {
             #[cfg(feature = "mmap")]
             {
                 let f = fs::File::open(&self.path)?;
-                let mmap = unsafe { memmap::MmapOptions::new().map(&f)? };
+                let mmap = unsafe { memmap2::MmapOptions::new().map(&f)? };
                 self.data = MailData::File(mmap);
             }
 
