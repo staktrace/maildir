@@ -18,7 +18,7 @@ maintenance = { status = "passively-maintained" }
 
 [dependencies]
 mailparse = "0.14"
-gethostname = "0.4.1"
+gethostname = "0.2.3"
 memmap2 = { version = "0.5.8", optional = true }
 
 [features]
