@@ -17,9 +17,9 @@ exclude = [".gitignore", ".github/**"]
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-mailparse = "0.13"
-gethostname = "0.2.1"
-memmap2 = { version = "0.5.7", optional = true }
+mailparse = "0.14"
+gethostname = "0.4.1"
+memmap2 = { version = "0.5.8", optional = true }
 
 [features]
 mmap = ["memmap2"]
