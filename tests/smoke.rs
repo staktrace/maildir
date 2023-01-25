@@ -133,6 +133,31 @@ fn maildir_list_subdirs() {
         assert!(subdirs.contains(&".Subdir2".into()));
         assert!(!subdirs.contains(&"..Subdir3".into()));
     });
+
+    with_maildir(SUBMAILDIRS_NAME, |maildir| {
+        let _e = maildir.create_subfolder_dirs(".created");
+        let _e = maildir.create_subfolder_dirs(".folder.with.subs");
+        let e2 = maildir.create_subfolder_dirs("invalid");
+        assert!(e2.is_err());
+        let subdirs: Vec<_> = maildir
+            .list_subdirs()
+            .map(|dir| {
+                dir.unwrap()
+                    .path()
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect();
+
+        assert_eq!(4, subdirs.len());
+        assert!(subdirs.contains(&".Subdir1".into()));
+        assert!(subdirs.contains(&".Subdir2".into()));
+        assert!(subdirs.contains(&".created".into()));
+        assert!(subdirs.contains(&".folder.with.subs".into()));
+        assert!(!subdirs.contains(&"..Subdir3".into()));
+    });
 }
 
 #[test]

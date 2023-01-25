@@ -19,6 +19,8 @@ use mailparse::*;
 const INFORMATIONAL_SUFFIX_SEPARATOR: &str = ":";
 #[cfg(windows)]
 const INFORMATIONAL_SUFFIX_SEPARATOR: &str = ";";
+/// List of the Maildir subfolders which are required to exist
+pub const MAILDIR_FOLDER_LIST: &'static [&'static str] = &["cur", "new", "tmp"];
 
 #[derive(Debug)]
 pub enum MailEntryError {
@@ -606,7 +608,24 @@ impl Maildir {
     /// responsibility to call this before using `store_new`.
     pub fn create_dirs(&self) -> std::io::Result<()> {
         let mut path = self.path.clone();
-        for d in &["cur", "new", "tmp"] {
+        for d in MAILDIR_FOLDER_LIST {
+            path.push(d);
+            fs::create_dir_all(path.as_path())?;
+            path.pop();
+        }
+        Ok(())
+    }
+
+    /// Creates all neccessary directories for a `subfolder` if they don't exist yet. It is the library user's
+    /// responsibility to call this before using `store` with a subfolder.
+    pub fn create_subfolder_dirs(&self, subfolder: &str) -> std::io::Result<()> {
+        if ! subfolder.starts_with('.') {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Subfolder must start with ."));
+        }
+        let subpath = PathBuf::from(subfolder);
+        let mut path = self.path.clone().join(&subpath);
+        fs::create_dir_all(path.as_path())?;
+        for d in MAILDIR_FOLDER_LIST {
             path.push(d);
             fs::create_dir_all(path.as_path())?;
             path.pop();
