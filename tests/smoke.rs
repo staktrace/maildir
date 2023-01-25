@@ -133,8 +133,11 @@ fn maildir_list_subdirs() {
         assert!(subdirs.contains(&".Subdir2".into()));
         assert!(!subdirs.contains(&"..Subdir3".into()));
     });
+}
 
-    with_maildir(SUBMAILDIRS_NAME, |maildir| {
+#[test]
+fn maildir_subdir() {
+    with_maildir(MAILDIR_NAME, |maildir| {
         let _e = maildir.create_subfolder_dirs(".created");
         let _e = maildir.create_subfolder_dirs(".folder.with.subs");
         let e2 = maildir.create_subfolder_dirs("invalid");
@@ -151,12 +154,28 @@ fn maildir_list_subdirs() {
             })
             .collect();
 
-        assert_eq!(4, subdirs.len());
-        assert!(subdirs.contains(&".Subdir1".into()));
-        assert!(subdirs.contains(&".Subdir2".into()));
+        assert_eq!(2, subdirs.len());
         assert!(subdirs.contains(&".created".into()));
         assert!(subdirs.contains(&".folder.with.subs".into()));
         assert!(!subdirs.contains(&"..Subdir3".into()));
+
+        // test subfolder api
+        let sf = maildir.subfolder(".folder.with.subs").unwrap();
+        let store_res = sf.store_new(&TEST_MAIL_BODY).unwrap();
+        sf.move_new_to_cur(&store_res).unwrap();
+        assert_eq!(
+            sf.find(&store_res).is_some(),
+            true);
+
+        // test subfolder api with newly created folder
+        let sf = maildir.subfolder(".notyes").unwrap();
+        sf.create_dirs().unwrap();
+        let store_res = sf.store_new(&TEST_MAIL_BODY).unwrap();
+        sf.move_new_to_cur(&store_res).unwrap();
+        assert_eq!(
+            sf.find(&store_res).is_some(),
+            true);
+
     });
 }
 
