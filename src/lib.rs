@@ -5,13 +5,17 @@ use std::error;
 use std::fmt;
 use std::fs;
 use std::io::prelude::*;
+use std::io::ErrorKind;
 use std::ops::Deref;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time;
+
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 use mailparse::*;
 
@@ -653,30 +657,73 @@ impl Maildir {
         // move to <timestamp>.M<usec>P<pid>V<dev>I<ino>.<hostname>,S=<size_in_bytes> when moving
         // to new dir. see for example http://www.courier-mta.org/maildir.html.
         let pid = std::process::id();
-        let hostname = gethostname::gethostname();
+        let hostname = gethostname::gethostname()
+            .into_string()
+            // the hostname is always ASCII in order to be a valid DNS
+            // name, so into_string() will always succeed. The error case
+            // here is to satisfy the compiler which doesn't know this.
+            .unwrap_or_else(|_| "localhost".to_string());
 
         // loop when conflicting filenames occur, as described at
         // http://www.courier-mta.org/maildir.html
         // this assumes that pid and hostname don't change.
-        let mut ts = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
         let mut tmppath = self.path.clone();
         tmppath.push("tmp");
+
+        let mut file;
+        let mut secs;
+        let mut nanos;
+        let mut counter;
+
         loop {
-            tmppath.push(format!(
-                "{}.M{}P{}.{}",
-                ts.as_secs(),
-                ts.subsec_nanos(),
-                pid,
-                hostname.to_string_lossy()
-            ));
-            if !tmppath.exists() {
-                break;
+            let ts = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
+            secs = ts.as_secs();
+            nanos = ts.subsec_nanos();
+            counter = COUNTER.fetch_add(1, Ordering::SeqCst);
+
+            tmppath.push(format!("{secs}.#{counter:x}M{nanos}P{pid}.{hostname}"));
+
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&tmppath)
+            {
+                Ok(f) => {
+                    file = f;
+                    break;
+                }
+                Err(err) => {
+                    if err.kind() != ErrorKind::AlreadyExists {
+                        return Err(err.into());
+                    }
+                    tmppath.pop();
+                }
             }
-            tmppath.pop();
-            ts += time::Duration::from_millis(10);
         }
 
-        let mut file = std::fs::File::create(tmppath.to_owned())?;
+        /// At this point, `file` is our new file at `tmppath`.
+        /// If we leave the scope of this function prior to
+        /// successfully writing the file to its final location,
+        /// we need to ensure that we remove the temporary file.
+        /// This struct takes care of that detail.
+        struct UnlinkOnError {
+            path_to_unlink: Option<PathBuf>,
+        }
+
+        impl Drop for UnlinkOnError {
+            fn drop(&mut self) {
+                if let Some(path) = self.path_to_unlink.take() {
+                    // Best effort to remove it
+                    std::fs::remove_file(path).ok();
+                }
+            }
+        }
+
+        // Ensure that we remove the temporary file on failure
+        let mut unlink_guard = UnlinkOnError {
+            path_to_unlink: Some(tmppath.clone()),
+        };
+
         file.write_all(data)?;
         file.sync_all()?;
 
@@ -702,19 +749,11 @@ impl Maildir {
         #[cfg(windows)]
         let size = meta.file_size();
 
-        let id = format!(
-            "{}.M{}P{}V{}I{}.{},S={}",
-            ts.as_secs(),
-            ts.subsec_nanos(),
-            pid,
-            dev,
-            ino,
-            hostname.to_string_lossy(),
-            size,
-        );
+        let id = format!("{secs}.#{counter:x}M{nanos}P{pid}V{dev}I{ino}.{hostname},S={size}");
         newpath.push(format!("{}{}", id, info));
-        std::fs::rename(tmppath, newpath)?;
 
+        std::fs::rename(&tmppath, &newpath)?;
+        unlink_guard.path_to_unlink.take();
         Ok(id)
     }
 }
