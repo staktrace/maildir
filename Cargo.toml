@@ -1,6 +1,6 @@
 [package]
 name = "maildir"
-version = "0.6.3"
+version = "0.6.4"
 authors = ["Kartikaya Gupta"]
 edition = "2018"
 license = "0BSD"
