@@ -23,6 +23,8 @@ use mailparse::*;
 const INFORMATIONAL_SUFFIX_SEPARATOR: &str = ":";
 #[cfg(windows)]
 const INFORMATIONAL_SUFFIX_SEPARATOR: &str = ";";
+/// List of the Maildir subfolders which are required to exist
+pub const MAILDIR_FOLDER_LIST: &'static [&'static str] = &["cur", "new", "tmp"];
 
 #[derive(Debug)]
 pub enum MailEntryError {
@@ -292,6 +294,7 @@ pub enum MaildirError {
     Io(std::io::Error),
     Utf8(std::str::Utf8Error),
     Time(std::time::SystemTimeError),
+    InvalidFolderName(std::string::String),
 }
 
 impl fmt::Display for MaildirError {
@@ -302,6 +305,7 @@ impl fmt::Display for MaildirError {
             Io(ref e) => write!(f, "IO Error: {}", e),
             Utf8(ref e) => write!(f, "UTF8 Encoding Error: {}", e),
             Time(ref e) => write!(f, "Time Error: {}", e),
+            InvalidFolderName(ref e) => write!(f, "Invalid Folder Name: {}", e),
         }
     }
 }
@@ -314,6 +318,7 @@ impl error::Error for MaildirError {
             Io(ref e) => Some(e),
             Utf8(ref e) => Some(e),
             Time(ref e) => Some(e),
+            InvalidFolderName(ref _e) => None,
         }
     }
 }
@@ -408,6 +413,18 @@ impl Maildir {
     /// Returns the path of the maildir base folder.
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// Creates a Maildir from the subfolder
+    pub fn subfolder(&self, subfolder: &str) -> Result<Maildir, MaildirError> {
+        if !subfolder.starts_with('.') {
+            return Err(MaildirError::InvalidFolderName(format!(
+                "Subfolder must start with a single period: {}",
+                subfolder
+            )));
+        }
+        let new_path = self.path.join(subfolder);
+        Ok(Maildir { path: new_path })
     }
 
     /// Returns the number of messages found inside the `new`
@@ -610,7 +627,26 @@ impl Maildir {
     /// responsibility to call this before using `store_new`.
     pub fn create_dirs(&self) -> std::io::Result<()> {
         let mut path = self.path.clone();
-        for d in &["cur", "new", "tmp"] {
+        for d in MAILDIR_FOLDER_LIST {
+            path.push(d);
+            fs::create_dir_all(path.as_path())?;
+            path.pop();
+        }
+        Ok(())
+    }
+
+    /// Creates all neccessary directories for a `subfolder` if they don't exist yet. It is the library user's
+    /// responsibility to call this before using `store` with a subfolder.
+    pub fn create_subfolder_dirs(&self, subfolder: &str) -> Result<(), MaildirError> {
+        if !subfolder.starts_with('.') {
+            return Err(MaildirError::InvalidFolderName(format!(
+                "Subfolder must start with a single period: {}",
+                subfolder
+            )));
+        }
+        let subpath = PathBuf::from(subfolder);
+        let mut path = self.path.clone().join(&subpath);
+        for d in MAILDIR_FOLDER_LIST {
             path.push(d);
             fs::create_dir_all(path.as_path())?;
             path.pop();

@@ -136,6 +136,49 @@ fn maildir_list_subdirs() {
 }
 
 #[test]
+fn maildir_subdir() {
+    with_maildir(MAILDIR_NAME, |maildir| {
+        let _e = maildir.create_subfolder_dirs(".created");
+        let _e = maildir.create_subfolder_dirs(".folder.with.subs");
+        let e2 = maildir.create_subfolder_dirs("invalid");
+        assert!(e2.is_err());
+        let subdirs: Vec<_> = maildir
+            .list_subdirs()
+            .map(|dir| {
+                dir.unwrap()
+                    .path()
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect();
+
+        assert_eq!(2, subdirs.len());
+        assert!(subdirs.contains(&".created".into()));
+        assert!(subdirs.contains(&".folder.with.subs".into()));
+        assert!(!subdirs.contains(&"..Subdir3".into()));
+
+        // test subfolder api
+        let sf = maildir.subfolder(".folder.with.subs").unwrap();
+        let store_res = sf.store_new(&TEST_MAIL_BODY).unwrap();
+        sf.move_new_to_cur(&store_res).unwrap();
+        assert!(sf.find(&store_res).is_some());
+
+        // test subfolder api with newly created folder
+        let sf = maildir.subfolder(".notyes").unwrap();
+        sf.store_new(&TEST_MAIL_BODY)
+            .expect_err("should not store new message when folder is missing");
+        sf.create_dirs().expect("should create folders");
+        let store_res = sf
+            .store_new(&TEST_MAIL_BODY)
+            .expect("message should be stored");
+        sf.move_new_to_cur(&store_res).unwrap();
+        assert!(sf.find(&store_res).is_some());
+    });
+}
+
+#[test]
 fn maildir_find() {
     with_maildir(MAILDIR_NAME, |maildir| {
         assert_eq!(
