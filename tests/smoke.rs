@@ -367,7 +367,7 @@ fn check_store_with_unique_settings() {
             TEST_MAIL_BODY,
             None, // No flags
         );
-        eprintln!("{:?}", id);
+
         assert!(id.is_ok());
         let message_id = id.as_mut().unwrap();
         assert!(message_id.contains("1721749101.#1M266173535P12345V"));
@@ -381,6 +381,63 @@ fn check_store_with_unique_settings() {
 
         assert_eq!(
             msg.unwrap().parsed().unwrap().get_body_raw().unwrap(),
+            b"Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_ref()
+        );
+    });
+}
+
+#[test]
+fn check_store_with_unique_settings_and_flags() {
+    let tmp_dir = tempdir().expect("could not create temporary directory");
+    let mut tmp_file_path = tmp_dir.into_path();
+    tmp_file_path.push(format!(
+        "maildir-temp-file.{}",
+        time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .expect("Duration should work")
+            .as_secs()
+    ));
+
+    let tmp_file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp_file_path)
+        .expect("The temp file should create");
+
+    with_maildir_empty("maildir4", |maildir| {
+        maildir.create_dirs().unwrap();
+
+        assert_eq!(maildir.count_new(), 0);
+        let mut id = maildir.store_with_unique_settings(
+            "cur",
+            &1,
+            &time::Duration::new(1721749101, 266173535),
+            &12345,
+            "mail-server.intranet",
+            &tmp_file_path,
+            &tmp_file,
+            TEST_MAIL_BODY,
+            // https://doc.dovecot.org/admin_manual/mailbox_formats/maildir/#usage-of-timestamps
+            Some("STln"),
+        );
+
+        assert!(id.is_ok());
+        let message_id = id.as_mut().unwrap();
+        assert!(message_id.contains("1721749101.#1M266173535P12345V"));
+        // The Inode part is not checked
+        assert!(message_id.contains(".mail-server.intranet,S=900"));
+        // Does not contain flags
+        assert!(!message_id.contains(":2,STln"));
+        assert_eq!(maildir.count_cur(), 1);
+
+        let id = id.unwrap();
+        let msg = maildir.find(&id);
+        assert!(&msg.is_some());
+        let mut final_message = msg.unwrap();
+        assert_eq!(final_message.flags(), "STln");
+
+        assert_eq!(
+            final_message.parsed().unwrap().get_body_raw().unwrap(),
             b"Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_ref()
         );
     });
