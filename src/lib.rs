@@ -671,22 +671,16 @@ impl Maildir {
         data: &[u8],
         flags: &str,
     ) -> std::result::Result<String, MaildirError> {
-        self.store(
-            Subfolder::Cur,
-            data,
-            &format!(
-                "{}2,{}",
-                INFORMATIONAL_SUFFIX_SEPARATOR,
-                Self::normalize_flags(flags)
-            ),
-        )
+        self.store(Subfolder::Cur, data, &Self::normalize_flags(flags))
     }
 
+    // https://doc.dovecot.org/admin_manual/mailbox_formats/maildir/#maildir-filename-extensions
+    // The standard filename definition is: <base filename>:2,<flags>
     fn store(
         &self,
         subfolder: Subfolder,
         data: &[u8],
-        info: &str,
+        flags: &str,
     ) -> std::result::Result<String, MaildirError> {
         // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
         // dovecot and courier IMAP use <timestamp>.M<usec>P<pid>.<hostname> for tmp-files and then
@@ -706,13 +700,14 @@ impl Maildir {
         let mut tmppath = self.path.clone();
         tmppath.push("tmp");
 
-        let mut file;
         let mut secs;
+        let mut ts;
         let mut nanos;
         let mut counter;
 
         loop {
-            let ts = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
+            let now = time::SystemTime::now();
+            ts = now.duration_since(time::UNIX_EPOCH)?;
             secs = ts.as_secs();
             nanos = ts.subsec_nanos();
             counter = COUNTER.fetch_add(1, Ordering::SeqCst);
@@ -724,9 +719,21 @@ impl Maildir {
                 .create_new(true)
                 .open(&tmppath)
             {
-                Ok(f) => {
-                    file = f;
-                    break;
+                Ok(file) => {
+                    return self.store_with_unique_settings(
+                        match subfolder {
+                            Subfolder::New => "new",
+                            Subfolder::Cur => "cur",
+                        },
+                        &counter,
+                        &now.duration_since(time::UNIX_EPOCH)?,
+                        &pid,
+                        &hostname,
+                        &tmppath.into(),
+                        &file,
+                        data,
+                        if flags.len() == 0 { None } else { Some(flags) },
+                    );
                 }
                 Err(err) => {
                     if err.kind() != ErrorKind::AlreadyExists {
@@ -736,8 +743,21 @@ impl Maildir {
                 }
             }
         }
+    }
 
-        /// At this point, `file` is our new file at `tmppath`.
+    pub fn store_with_unique_settings(
+        &self,
+        subfolder: &str,
+        sequence_number: &usize,
+        timestamp: &time::Duration,
+        pid: &u32,
+        hostname: &str,
+        tmp_file_path: &PathBuf,
+        mut tmp_file: &std::fs::File,
+        data: &[u8],
+        flags: Option<&str>,
+    ) -> std::result::Result<String, MaildirError> {
+        /// At this point, `file` is our new file at `tmp_file_path`.
         /// If we leave the scope of this function prior to
         /// successfully writing the file to its final location,
         /// we need to ensure that we remove the temporary file.
@@ -757,18 +777,15 @@ impl Maildir {
 
         // Ensure that we remove the temporary file on failure
         let mut unlink_guard = UnlinkOnError {
-            path_to_unlink: Some(tmppath.clone()),
+            path_to_unlink: Some(tmp_file_path.to_path_buf()),
         };
 
-        file.write_all(data)?;
-        file.sync_all()?;
+        tmp_file.write_all(data)?;
+        tmp_file.sync_all()?;
 
-        let meta = file.metadata()?;
+        let meta = tmp_file.metadata()?;
         let mut newpath = self.path.clone();
-        newpath.push(match subfolder {
-            Subfolder::New => "new",
-            Subfolder::Cur => "cur",
-        });
+        newpath.push(subfolder);
 
         #[cfg(unix)]
         let dev = meta.dev();
@@ -785,10 +802,19 @@ impl Maildir {
         #[cfg(windows)]
         let size = meta.file_size();
 
-        let id = format!("{secs}.#{counter:x}M{nanos}P{pid}V{dev}I{ino}.{hostname},S={size}");
-        newpath.push(format!("{}{}", id, info));
+        let secs = timestamp.as_secs();
+        let nanos = timestamp.subsec_nanos();
 
-        std::fs::rename(&tmppath, &newpath)?;
+        let id =
+            format!("{secs}.#{sequence_number:x}M{nanos}P{pid}V{dev}I{ino}.{hostname},S={size}");
+
+        let flags_str = match flags {
+            Some(flags) => format!("{}2,{}", INFORMATIONAL_SUFFIX_SEPARATOR, flags),
+            None => "".to_string(),
+        };
+        newpath.push(format!("{}{}", id, flags_str));
+
+        std::fs::rename(&tmp_file_path, &newpath)?;
         unlink_guard.path_to_unlink.take();
         Ok(id)
     }

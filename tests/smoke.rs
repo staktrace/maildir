@@ -11,6 +11,7 @@ use std::fs;
 use std::os::unix::ffi::OsStrExt;
 #[cfg(windows)]
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use std::time;
 
 use mailparse::MailHeaderMap;
 use percent_encoding::percent_decode;
@@ -320,6 +321,58 @@ fn check_store_new() {
         assert_eq!(maildir.count_new(), 0);
         let id = maildir.store_new(TEST_MAIL_BODY);
         assert!(id.is_ok());
+        assert_eq!(maildir.count_new(), 1);
+
+        let id = id.unwrap();
+        let msg = maildir.find(&id);
+        assert!(msg.is_some());
+
+        assert_eq!(
+            msg.unwrap().parsed().unwrap().get_body_raw().unwrap(),
+            b"Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_ref()
+        );
+    });
+}
+
+#[test]
+fn check_store_with_unique_settings() {
+    let tmp_dir = tempdir().expect("could not create temporary directory");
+    let mut tmp_file_path = tmp_dir.into_path();
+    tmp_file_path.push(format!(
+        "maildir-temp-file.{}",
+        time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .expect("Duration should work")
+            .as_secs()
+    ));
+
+    let tmp_file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp_file_path)
+        .expect("The temp file should create");
+
+    with_maildir_empty("maildir3", |maildir| {
+        maildir.create_dirs().unwrap();
+
+        assert_eq!(maildir.count_new(), 0);
+        let mut id = maildir.store_with_unique_settings(
+            "new",
+            &1,
+            &time::Duration::new(1721749101, 266173535),
+            &12345,
+            "mail-server.intranet",
+            &tmp_file_path,
+            &tmp_file,
+            TEST_MAIL_BODY,
+            None, // No flags
+        );
+        eprintln!("{:?}", id);
+        assert!(id.is_ok());
+        let message_id = id.as_mut().unwrap();
+        assert!(message_id.contains("1721749101.#1M266173535P12345V"));
+        // The Inode part is not checked
+        assert!(message_id.contains(".mail-server.intranet,S=900"));
         assert_eq!(maildir.count_new(), 1);
 
         let id = id.unwrap();
