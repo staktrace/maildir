@@ -1,3 +1,5 @@
+#![warn(missing_debug_implementations)]
+
 #[cfg(feature = "mmap")]
 extern crate memmap2;
 
@@ -86,6 +88,24 @@ impl MailData {
             _ => false,
         }
     }
+
+    fn as_bytes(&self) -> Option<&[u8]> {
+        match self {
+            Self::None => None,
+            #[cfg(not(feature = "mmap"))]
+            Self::Bytes(buf) => Some(&buf),
+            #[cfg(feature = "mmap")]
+            Self::File(buf) => Some(&buf),
+        }
+    }
+}
+
+impl fmt::Debug for MailData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Debug as a string rather than a byte slice
+        let mapped = self.as_bytes().map(|buf| String::from_utf8_lossy(&buf));
+        fmt::Debug::fmt(&mapped, f)
+    }
 }
 
 /// This struct represents a single email message inside
@@ -93,6 +113,7 @@ impl MailData {
 /// load the content of the email file into memory - however,
 /// that may happen upon calling functions that require parsing
 /// the email.
+#[derive(Debug)]
 pub struct MailEntry {
     id: String,
     flags: String,
@@ -205,6 +226,7 @@ impl MailEntry {
     }
 }
 
+#[derive(Debug)]
 enum Subfolder {
     New,
     Cur,
@@ -217,6 +239,7 @@ enum Subfolder {
 /// file system properties on a particular entry, or if an
 /// invalid file was found in the maildir. Files starting with
 /// a dot (.) character in the maildir folder are ignored.
+#[derive(Debug)]
 pub struct MailEntries {
     path: PathBuf,
     subfolder: Subfolder,
@@ -344,6 +367,7 @@ impl From<std::time::SystemTimeError> for MaildirError {
 /// `Err` if an error was encountered while trying to read
 /// file system properties on a particular entry. Only
 /// subdirectories starting with a single period are included.
+#[derive(Debug)]
 pub struct MaildirEntries {
     path: PathBuf,
     readdir: Option<fs::ReadDir>,
@@ -405,6 +429,7 @@ impl Iterator for MaildirEntries {
 /// instantiated from a path using the `from` implementations.
 /// The path passed in to the `from` should be the root of the
 /// maildir (the folder containing `cur`, `new`, and `tmp`).
+#[derive(Debug)]
 pub struct Maildir {
     path: PathBuf,
 }
