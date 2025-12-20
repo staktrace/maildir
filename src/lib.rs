@@ -519,18 +519,18 @@ impl Maildir {
 
     /// Copies a message from the current maildir to the targetted maildir.
     pub fn copy_to(&self, id: &str, target: &Maildir) -> std::io::Result<()> {
-        let entry = self.find(id).ok_or_else(|| {
+        let entry = self.find_folder(id).ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::NotFound, "Mail entry not found")
         })?;
-        let filename = entry.path().file_name().ok_or_else(|| {
+        let filename = entry.0.path().file_name().ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Invalid mail entry file name",
             )
         })?;
 
-        let src_path = entry.path();
-        let dst_path = target.path().join("cur").join(filename);
+        let src_path = entry.0.path();
+        let dst_path = target.path().join(entry.1.to_str()).join(filename);
         if src_path == &dst_path {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -544,16 +544,19 @@ impl Maildir {
 
     /// Moves a message from the current maildir to the targetted maildir.
     pub fn move_to(&self, id: &str, target: &Maildir) -> std::io::Result<()> {
-        let entry = self.find(id).ok_or_else(|| {
+        let entry = self.find_folder(id).ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::NotFound, "Mail entry not found")
         })?;
-        let filename = entry.path().file_name().ok_or_else(|| {
+        let filename = entry.0.path().file_name().ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Invalid mail entry file name",
             )
         })?;
-        fs::rename(entry.path(), target.path().join("cur").join(filename))?;
+        fs::rename(
+            entry.0.path(),
+            target.path().join(entry.1.to_str()).join(filename),
+        )?;
         Ok(())
     }
 

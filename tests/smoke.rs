@@ -246,12 +246,25 @@ fn check_copy_and_move() {
             assert!(maildir.find(id).is_some());
             assert!(submaildir.find(id).is_some());
 
-            // move the message from "submaildir" to "maildir"
-            submaildir.move_to(id, &maildir).unwrap();
+            let new_id = "1463941010.5f7fa6dd4922c183dc457d033deee9d7";
+            // move a message from maildir's new subfolder to submaildir
+            maildir.move_to(new_id, &submaildir).unwrap();
 
-            // check that the message is now only present in "maildir"
-            assert!(maildir.find(id).is_some());
-            assert!(submaildir.find(id).is_none());
+            // check that the message is now only present in submaildir, in
+            // the new subfolder
+            assert!(submaildir.find(new_id).is_some());
+            assert_eq!(
+                submaildir
+                    .find(new_id)
+                    .unwrap()
+                    .path()
+                    .parent()
+                    .unwrap()
+                    .file_name()
+                    .unwrap(),
+                "new"
+            );
+            assert!(maildir.find(new_id).is_none());
         })
     })
 }
