@@ -146,7 +146,7 @@ impl MailEntry {
         Ok(())
     }
 
-    pub fn parsed(&mut self) -> Result<ParsedMail, MailEntryError> {
+    pub fn parsed(&mut self) -> Result<ParsedMail<'_>, MailEntryError> {
         self.read_data()?;
         match self.data {
             MailData::None => panic!("read_data should have returned an Err!"),
@@ -157,7 +157,7 @@ impl MailEntry {
         }
     }
 
-    pub fn headers(&mut self) -> Result<Vec<MailHeader>, MailEntryError> {
+    pub fn headers(&mut self) -> Result<Vec<MailHeader<'_>>, MailEntryError> {
         self.read_data()?;
         let headers = match self.data {
             MailData::None => panic!("read_data should have returned an Err!"),
