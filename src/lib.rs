@@ -232,6 +232,15 @@ enum Subfolder {
     Cur,
 }
 
+impl Subfolder {
+    fn to_str(&self) -> &str {
+        match &self {
+            Subfolder::New => "new",
+            Subfolder::Cur => "cur",
+        }
+    }
+}
+
 /// An iterator over the email messages in a particular
 /// maildir subfolder (either `cur` or `new`). This iterator
 /// produces a `std::io::Result<MailEntry>`, which can be an
@@ -262,10 +271,7 @@ impl Iterator for MailEntries {
     fn next(&mut self) -> Option<std::io::Result<MailEntry>> {
         if self.readdir.is_none() {
             let mut dir_path = self.path.clone();
-            dir_path.push(match self.subfolder {
-                Subfolder::New => "new",
-                Subfolder::Cur => "cur",
-            });
+            dir_path.push(self.subfolder.to_str());
             self.readdir = match fs::read_dir(dir_path) {
                 Err(_) => return None,
                 Ok(v) => Some(v),
