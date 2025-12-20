@@ -561,6 +561,14 @@ impl Maildir {
     /// maildir. This searches both the `new` and the `cur`
     /// folders.
     pub fn find(&self, id: &str) -> Option<MailEntry> {
+        self.find_folder(id).map(|r| r.0)
+    }
+
+    /// Tries to find the message with the given id in the
+    /// maildir. This searches both the `new` and the `cur`
+    /// folders, and returns the MailEntry along with the
+    /// Subfolder it was found in, or None if not found.
+    pub(crate) fn find_folder(&self, id: &str) -> Option<(MailEntry, Subfolder)> {
         let filter = |entry: &std::io::Result<MailEntry>| match *entry {
             Err(_) => false,
             Ok(ref e) => e.id() == id,
@@ -568,8 +576,9 @@ impl Maildir {
 
         self.list_new()
             .find(&filter)
-            .or_else(|| self.list_cur().find(&filter))
-            .map(|e| e.unwrap())
+            .map(|m| (m, Subfolder::New))
+            .or_else(|| self.list_cur().find(&filter).map(|m| (m, Subfolder::Cur)))
+            .map(|(m, f)| (m.unwrap(), f))
     }
 
     fn normalize_flags(flags: &str) -> String {
