@@ -282,7 +282,15 @@ impl Iterator for MailEntries {
                     return Ok(None);
                 }
                 let (id, flags) = match self.subfolder {
-                    Subfolder::New => (Some(filename.as_str()), Some("")),
+                    Subfolder::New => {
+                        let delim = format!("{}2,", INFORMATIONAL_SUFFIX_SEPARATOR);
+                        if filename.contains(delim.as_str()) {
+                            let mut iter = filename.split(&delim);
+                            (iter.next(), iter.next())
+                        } else {
+                            (Some(filename.as_str()), Some(""))
+                        }
+                    }
                     Subfolder::Cur => {
                         let delim = format!("{}2,", INFORMATIONAL_SUFFIX_SEPARATOR);
                         let mut iter = filename.split(&delim);
@@ -685,6 +693,27 @@ impl Maildir {
     /// Returns the Id of the inserted message on success.
     pub fn store_new(&self, data: &[u8]) -> std::result::Result<String, MaildirError> {
         self.store(Subfolder::New, data, "")
+    }
+
+    /// Stores the given message data as a new message file in the Maildir `new` folder, adding the
+    /// given `flags` to it. This is technically out of spec, but certain MDAs and MUAs depend on
+    /// this behavior. The possible flags are explained e.g. at
+    /// <https://cr.yp.to/proto/maildir.html> or <http://www.courier-mta.org/maildir.html>. Returns
+    /// the Id of the inserted message on success.
+    pub fn store_new_with_flags(
+        &self,
+        data: &[u8],
+        flags: &str,
+    ) -> std::result::Result<String, MaildirError> {
+        self.store(
+            Subfolder::New,
+            data,
+            &format!(
+                "{}2,{}",
+                INFORMATIONAL_SUFFIX_SEPARATOR,
+                Self::normalize_flags(flags)
+            ),
+        )
     }
 
     /// Stores the given message data as a new message file in the Maildir `cur` folder, adding the
