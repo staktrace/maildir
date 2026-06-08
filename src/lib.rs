@@ -6,8 +6,9 @@ extern crate memmap2;
 use std::error;
 use std::fmt;
 use std::fs;
+use std::io;
 use std::io::prelude::*;
-use std::io::ErrorKind;
+use std::io::{Cursor, ErrorKind};
 use std::ops::Deref;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
@@ -692,6 +693,14 @@ impl Maildir {
     /// `store_new`.
     /// Returns the Id of the inserted message on success.
     pub fn store_new(&self, data: &[u8]) -> std::result::Result<String, MaildirError> {
+        self.store(Subfolder::New, &mut Cursor::new(data), "")
+    }
+
+    /// Stores the given message data as a new message file in the Maildir `new` folder. Does not
+    /// create the neccessary directories, so if in doubt call `create_dirs` before using
+    /// `store_new`.
+    /// Returns the Id of the inserted message on success.
+    pub fn store_new_read(&self, data: &mut dyn Read) -> std::result::Result<String, MaildirError> {
         self.store(Subfolder::New, data, "")
     }
 
@@ -703,6 +712,19 @@ impl Maildir {
     pub fn store_new_with_flags(
         &self,
         data: &[u8],
+        flags: &str,
+    ) -> std::result::Result<String, MaildirError> {
+        self.store_new_read_with_flags(&mut Cursor::new(data), flags)
+    }
+
+    /// Stores the given message data as a new message file in the Maildir `new` folder, adding the
+    /// given `flags` to it. This is technically out of spec, but certain MDAs and MUAs depend on
+    /// this behavior. The possible flags are explained e.g. at
+    /// <https://cr.yp.to/proto/maildir.html> or <http://www.courier-mta.org/maildir.html>. Returns
+    /// the Id of the inserted message on success.
+    pub fn store_new_read_with_flags(
+        &self,
+        data: &mut dyn Read,
         flags: &str,
     ) -> std::result::Result<String, MaildirError> {
         self.store(
@@ -725,6 +747,18 @@ impl Maildir {
         data: &[u8],
         flags: &str,
     ) -> std::result::Result<String, MaildirError> {
+        self.store_cur_read_with_flags(&mut Cursor::new(data), flags)
+    }
+
+    /// Stores the given message data as a new message file in the Maildir `cur` folder, adding the
+    /// given `flags` to it. The possible flags are explained e.g. at
+    /// <https://cr.yp.to/proto/maildir.html> or <http://www.courier-mta.org/maildir.html>.
+    /// Returns the Id of the inserted message on success.
+    pub fn store_cur_read_with_flags(
+        &self,
+        data: &mut dyn Read,
+        flags: &str,
+    ) -> std::result::Result<String, MaildirError> {
         self.store(
             Subfolder::Cur,
             data,
@@ -739,7 +773,7 @@ impl Maildir {
     fn store(
         &self,
         subfolder: Subfolder,
-        data: &[u8],
+        data: &mut dyn Read,
         info: &str,
     ) -> std::result::Result<String, MaildirError> {
         // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
@@ -814,7 +848,7 @@ impl Maildir {
             path_to_unlink: Some(tmppath.clone()),
         };
 
-        file.write_all(data)?;
+        io::copy(data, &mut file)?;
         file.sync_all()?;
 
         let meta = file.metadata()?;
