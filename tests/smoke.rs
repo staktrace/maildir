@@ -6,11 +6,11 @@ use std::borrow::Cow;
 use std::ffi::OsStr;
 #[cfg(windows)]
 use std::ffi::OsString;
-use std::fs;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(windows)]
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use std::{fs, io::Write};
 
 use mailparse::MailHeaderMap;
 use percent_encoding::percent_decode;
@@ -355,6 +355,52 @@ fn check_store_new_with_flags() {
 }
 
 #[test]
+fn check_store_new_through_tempfile() {
+    with_maildir_empty("maildir2", |maildir| {
+        maildir.create_dirs().unwrap();
+
+        assert_eq!(maildir.count_new(), 0);
+        let mut tempfile = maildir.open_file_in_tmp().unwrap();
+        tempfile.write_all(TEST_MAIL_BODY).unwrap();
+        let id = maildir.move_tmp_to_new(tempfile);
+        assert!(id.is_ok());
+        assert_eq!(maildir.count_new(), 1);
+
+        let id = id.unwrap();
+        let msg = maildir.find(&id);
+        assert!(msg.is_some());
+
+        assert_eq!(
+            msg.unwrap().parsed().unwrap().get_body_raw().unwrap(),
+            b"Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_ref()
+        );
+    });
+}
+
+#[test]
+fn check_store_new_with_flags_through_tempfile() {
+    with_maildir_empty("maildir2", |maildir| {
+        maildir.create_dirs().unwrap();
+
+        assert_eq!(maildir.count_new(), 0);
+        let mut tempfile = maildir.open_file_in_tmp().unwrap();
+        tempfile.write_all(TEST_MAIL_BODY).unwrap();
+        let id = maildir.move_tmp_to_new_with_flags(tempfile, "F");
+        assert!(id.is_ok());
+        assert_eq!(maildir.count_new(), 1);
+
+        let id = id.unwrap();
+        let msg = maildir.find(&id);
+        assert!(msg.is_some());
+
+        assert_eq!(
+            msg.unwrap().parsed().unwrap().get_body_raw().unwrap(),
+            b"Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_ref()
+        );
+    });
+}
+
+#[test]
 fn check_store_new_with_flags_coexist_with_store_new_without() {
     with_maildir_empty("maildir2", |maildir| {
         maildir.create_dirs().unwrap();
@@ -394,6 +440,29 @@ fn check_store_cur() {
         let mut iter = maildir.list_cur();
         let first = iter.next().unwrap().unwrap();
         assert_eq!(first.flags(), testflags);
+    });
+}
+
+#[test]
+fn check_store_cur_through_tempfile() {
+    with_maildir_empty("maildir2", |maildir| {
+        maildir.create_dirs().unwrap();
+
+        assert_eq!(maildir.count_new(), 0);
+        let mut tempfile = maildir.open_file_in_tmp().unwrap();
+        tempfile.write_all(TEST_MAIL_BODY).unwrap();
+        let id = maildir.move_tmp_to_cur_with_flags(tempfile, "F");
+        assert!(id.is_ok());
+        assert_eq!(maildir.count_cur(), 1);
+
+        let id = id.unwrap();
+        let msg = maildir.find(&id);
+        assert!(msg.is_some());
+
+        assert_eq!(
+            msg.unwrap().parsed().unwrap().get_body_raw().unwrap(),
+            b"Today is Boomtime, the 59th day of Discord in the YOLD 3183".as_ref()
+        );
     });
 }
 

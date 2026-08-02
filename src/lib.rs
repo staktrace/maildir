@@ -442,6 +442,53 @@ pub struct Maildir {
     path: PathBuf,
 }
 
+/// An owned handle to a freshly-created file in the maildir's `tmp/`
+/// folder. Callers stream message bytes in via the `Write` impl (or
+/// the `path()` accessor for tools that want a path), then hand the
+/// handle to `store_new_with_flags_from_tmp` to atomically promote it
+/// into `new/` (or `cur/`).
+///
+/// If the handle is dropped without being promoted, the tmp file is
+/// best-effort unlinked so failed deliveries don't leak.
+#[derive(Debug)]
+pub struct TemporaryMailFile {
+    file: fs::File,
+    path: PathBuf,
+    hostname: String,
+    pid: u32,
+    secs: u64,
+    nanos: u32,
+    counter: usize,
+    delivered: bool,
+}
+
+impl TemporaryMailFile {
+    /// Path of the temporary file inside the maildir's `tmp/` folder.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Write for TemporaryMailFile {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.file.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.file.flush()
+    }
+}
+
+impl Drop for TemporaryMailFile {
+    fn drop(&mut self) {
+        if !self.delivered {
+            // Best-effort: a delivered file no longer lives at `self.path`,
+            // so this only runs for abandoned tmp files.
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+}
+
 impl Maildir {
     /// Returns the path of the maildir base folder.
     pub fn path(&self) -> &Path {
@@ -736,12 +783,56 @@ impl Maildir {
         )
     }
 
-    fn store(
+    /// Moves the message file in the Maildir `tmp` folder to the Maildir `new` folder.
+    pub fn move_tmp_to_new(
         &self,
-        subfolder: Subfolder,
-        data: &[u8],
-        info: &str,
+        tmpfile: TemporaryMailFile,
     ) -> std::result::Result<String, MaildirError> {
+        self.move_from_tmp(Subfolder::New, "", tmpfile)
+    }
+
+    /// Moves the message file in the Maildir `tmp` folder to the Maildir `new` folder, adding the
+    /// given `flags` to it. This is technically out of spec, but certain MDAs and MUAs depend on
+    /// this behavior. The possible flags are explained e.g. at
+    /// <https://cr.yp.to/proto/maildir.html> or <http://www.courier-mta.org/maildir.html>. Returns
+    /// the Id of the inserted message on success.
+    pub fn move_tmp_to_new_with_flags(
+        &self,
+        tmpfile: TemporaryMailFile,
+        flags: &str,
+    ) -> std::result::Result<String, MaildirError> {
+        self.move_from_tmp(
+            Subfolder::New,
+            &format!(
+                "{}2,{}",
+                INFORMATIONAL_SUFFIX_SEPARATOR,
+                Self::normalize_flags(flags)
+            ),
+            tmpfile,
+        )
+    }
+
+    /// Moves the message file in the Maildir `tmp` folder to the Maildir `cur` folder, adding the
+    /// given `flags` to it. The possible flags are explained e.g. at
+    /// <https://cr.yp.to/proto/maildir.html> or <http://www.courier-mta.org/maildir.html>. Returns
+    /// the Id of the inserted message on success.
+    pub fn move_tmp_to_cur_with_flags(
+        &self,
+        tmpfile: TemporaryMailFile,
+        flags: &str,
+    ) -> std::result::Result<String, MaildirError> {
+        self.move_from_tmp(
+            Subfolder::Cur,
+            &format!(
+                "{}2,{}",
+                INFORMATIONAL_SUFFIX_SEPARATOR,
+                Self::normalize_flags(flags)
+            ),
+            tmpfile,
+        )
+    }
+
+    pub fn open_file_in_tmp(&self) -> std::result::Result<TemporaryMailFile, MaildirError> {
         // try to get some uniquenes, as described at http://cr.yp.to/proto/maildir.html
         // dovecot and courier IMAP use <timestamp>.M<usec>P<pid>.<hostname> for tmp-files and then
         // move to <timestamp>.M<usec>P<pid>V<dev>I<ino>.<hostname>,S=<size_in_bytes> when moving
@@ -760,11 +851,10 @@ impl Maildir {
         let mut tmppath = self.path.clone();
         tmppath.push("tmp");
 
-        let mut file;
+        let file;
         let mut secs;
         let mut nanos;
         let mut counter;
-
         loop {
             let ts = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
             secs = ts.as_secs();
@@ -791,33 +881,38 @@ impl Maildir {
             }
         }
 
-        /// At this point, `file` is our new file at `tmppath`.
-        /// If we leave the scope of this function prior to
-        /// successfully writing the file to its final location,
-        /// we need to ensure that we remove the temporary file.
-        /// This struct takes care of that detail.
-        struct UnlinkOnError {
-            path_to_unlink: Option<PathBuf>,
-        }
+        Ok(TemporaryMailFile {
+            hostname,
+            pid,
+            secs,
+            nanos,
+            counter,
+            file,
+            path: tmppath,
+            delivered: false,
+        })
+    }
 
-        impl Drop for UnlinkOnError {
-            fn drop(&mut self) {
-                if let Some(path) = self.path_to_unlink.take() {
-                    // Best effort to remove it
-                    std::fs::remove_file(path).ok();
-                }
-            }
-        }
+    fn store(
+        &self,
+        subfolder: Subfolder,
+        data: &[u8],
+        info: &str,
+    ) -> std::result::Result<String, MaildirError> {
+        let mut temp_mailfile = self.open_file_in_tmp()?;
+        temp_mailfile.write_all(data)?;
+        self.move_from_tmp(subfolder, info, temp_mailfile)
+    }
 
-        // Ensure that we remove the temporary file on failure
-        let mut unlink_guard = UnlinkOnError {
-            path_to_unlink: Some(tmppath.clone()),
-        };
+    fn move_from_tmp(
+        &self,
+        subfolder: Subfolder,
+        info: &str,
+        mut temp_mailfile: TemporaryMailFile,
+    ) -> std::result::Result<String, MaildirError> {
+        temp_mailfile.file.sync_all()?;
 
-        file.write_all(data)?;
-        file.sync_all()?;
-
-        let meta = file.metadata()?;
+        let meta = temp_mailfile.file.metadata()?;
         let mut newpath = self.path.clone();
         newpath.push(match subfolder {
             Subfolder::New => "new",
@@ -839,11 +934,17 @@ impl Maildir {
         #[cfg(windows)]
         let size = meta.file_size();
 
+        let hostname = &temp_mailfile.hostname;
+        let pid = temp_mailfile.pid;
+        let secs = temp_mailfile.secs;
+        let nanos = temp_mailfile.nanos;
+        let counter = temp_mailfile.counter;
         let id = format!("{secs}.#{counter:x}M{nanos}P{pid}V{dev}I{ino}.{hostname},S={size}");
         newpath.push(format!("{}{}", id, info));
 
-        std::fs::rename(&tmppath, &newpath)?;
-        unlink_guard.path_to_unlink.take();
+        std::fs::rename(&temp_mailfile.path, &newpath)?;
+        // Disarm the Drop-based unlink: the file now lives at `newpath`.
+        temp_mailfile.delivered = true;
         Ok(id)
     }
 }
